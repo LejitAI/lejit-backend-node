@@ -11,7 +11,7 @@ dotenv.config();
 const app = express();
 
 app.use(cors({
-    origin: 'https://lejit-backend-node.onrender.com', // Replace with your frontend URL
+    origin: 'http://localhost:3000/', // Replace with your frontend URL
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
