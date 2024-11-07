@@ -4,6 +4,8 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const chatRoutes = require('./routes/chat');
+const cors = require('cors'); // Import the CORS library
+
 
 dotenv.config();
 const app = express();
