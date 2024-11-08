@@ -4,17 +4,18 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const chatRoutes = require('./routes/chat');
-const cors = require('cors'); // Import the CORS library
 
-
+const cors=require("cors");
+const corsOptions ={
+   origin:'*', 
+   credentials:true,            //access-control-allow-credentials:true
+   optionSuccessStatus:200,
+}
 dotenv.config();
 const app = express();
+app.use(cors(corsOptions)) // Use this after the variable declaration
 
-app.use(cors({
-    origin: 'http://localhost:3000/', // Replace with your frontend URL
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+
 
 
 // Connect to MongoDB
