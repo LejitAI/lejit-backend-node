@@ -4,6 +4,7 @@ const Settings = require('../models/Settings');
 const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
 const router = express.Router();
 const User = require('../models/User');
+const TeamMember = require('../models/TeamMember');
 
 // Add or update ChatGPT API key
 router.post('/set-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req, res) => {
@@ -54,6 +55,32 @@ router.get('/get-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
+// API to add a new team member by an admin
+router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, res) => {
+    const {
+        personalDetails,
+        professionalDetails,
+        bankAccountDetails
+    } = req.body;
+
+    try {
+        // Create and save new team member
+        const newTeamMember = new TeamMember({
+            personalDetails,
+            professionalDetails,
+            bankAccountDetails,
+            createdBy: req.user.id, // Assuming req.user contains the admin's ID
+        });
+
+        await newTeamMember.save();
+        res.status(201).json({ message: 'Team member added successfully', teamMember: newTeamMember });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to add team member. Please try again later.' });
     }
 });
 
