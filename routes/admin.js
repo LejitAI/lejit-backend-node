@@ -5,6 +5,7 @@ const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
 const router = express.Router();
 const User = require('../models/User');
 const TeamMember = require('../models/TeamMember');
+const bcrypt = require('bcryptjs');
 
 // Add or update ChatGPT API key
 router.post('/set-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req, res) => {
@@ -64,7 +65,8 @@ router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, r
     const {
         personalDetails,
         professionalDetails,
-        bankAccountDetails
+        bankAccountDetails,
+        password
     } = req.body;
 
     try {
@@ -73,15 +75,20 @@ router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, r
             personalDetails,
             professionalDetails,
             bankAccountDetails,
-            createdBy: req.user.id, // Assuming req.user contains the admin's ID
+            password,
+            createdBy: req.user.id,
         });
 
         await newTeamMember.save();
         res.status(201).json({ message: 'Team member added successfully', teamMember: newTeamMember });
     } catch (error) {
+        // Handle unique email constraint error
+        if (error.code === 11000 && error.keyPattern && error.keyPattern['personalDetails.email']) {
+            return res.status(400).json({ message: 'Email is already in use. Please use a different email.' });
+        }
         console.error(error);
         res.status(500).json({ message: 'Failed to add team member. Please try again later.' });
     }
+    
 });
-
 module.exports = router;

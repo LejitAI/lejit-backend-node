@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const teamMemberSchema = new mongoose.Schema({
     personalDetails: {
@@ -7,7 +8,11 @@ const teamMemberSchema = new mongoose.Schema({
         gender: String,
         yearsOfExperience: Number,
         mobile: String,
-        email: String,
+        email: {
+            type: String,
+            required: true,
+            unique: true // Ensures email is unique for each team member
+        },
         address: {
             line1: String,
             line2: String,
@@ -39,8 +44,23 @@ const teamMemberSchema = new mongoose.Schema({
         },
         upiId: String,
     },
+    password: {
+        type: String,
+        required: true,
+        select: false // Prevents password from being returned in queries by default
+    },
     createdAt: { type: Date, default: Date.now },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Reference to admin who added the member
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 });
+
+// Hash password before saving
+teamMemberSchema.pre('save', async function (next) {
+    if (!this.isModified('password')) return next();
+    this.password = await bcrypt.hash(this.password, 10);
+    next();
+});
+
+// Create unique index on email
+teamMemberSchema.index({ "personalDetails.email": 1 }, { unique: true });
 
 module.exports = mongoose.model('TeamMember', teamMemberSchema);
