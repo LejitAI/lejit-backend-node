@@ -62,7 +62,7 @@ router.get('/get-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req
 
 
 // API to add a new team member by an admin
-router.post('/add-team-member', authorizeAdmin, async (req, res) => {
+router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, res) => {
     const {
         personalDetails,
         professionalDetails,
