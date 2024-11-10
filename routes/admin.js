@@ -134,4 +134,16 @@ router.post('/add-case', authenticateToken, authorizeAdmin, async (req, res) => 
 });
 
 
+// API to get all team members
+router.get('/get-team-members', authenticateToken, authorizeAdmin, async (req, res) => {
+    try {
+        const teamMembers = await TeamMember.find({}, '-password'); // Exclude password field for security
+        res.status(200).json(teamMembers);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve team members. Please try again later.' });
+    }
+});
+
+
 module.exports = router;
