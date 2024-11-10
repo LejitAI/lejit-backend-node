@@ -6,6 +6,7 @@ const router = express.Router();
 const User = require('../models/User');
 const TeamMember = require('../models/TeamMember');
 const bcrypt = require('bcryptjs');
+const Case = require('../models/Case'); // Import Case model
 
 // Add or update ChatGPT API key
 router.post('/set-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req, res) => {
@@ -91,4 +92,46 @@ router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, r
     }
     
 });
+
+
+// API to add a new case by an admin
+router.post('/add-case', authenticateToken, authorizeAdmin, async (req, res) => {
+    const {
+        title,
+        startingDate,
+        caseType,
+        client,
+        oppositeClient,
+        caseWitness,
+        caseDescription,
+        documents
+    } = req.body;
+
+    if (!title || !startingDate || !caseType || !client) {
+        return res.status(400).json({ message: 'Please fill in all required fields.' });
+    }
+
+    try {
+        // Create and save new case
+        const newCase = new Case({
+            title,
+            startingDate: new Date(startingDate),
+            caseType,
+            client,
+            oppositeClient,
+            caseWitness,
+            caseDescription,
+            documents,
+            createdBy: req.user.id,
+        });
+
+        await newCase.save();
+        res.status(201).json({ message: 'Case added successfully', case: newCase });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to add case. Please try again later.' });
+    }
+});
+
+
 module.exports = router;
