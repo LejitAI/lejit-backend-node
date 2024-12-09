@@ -7,6 +7,7 @@ const User = require('../models/User');
 const TeamMember = require('../models/TeamMember');
 const bcrypt = require('bcryptjs');
 const Case = require('../models/Case'); // Import Case model
+const ImageForm = require('../models/LawFirm');
 
 // Add or update ChatGPT API key
 router.post('/set-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req, res) => {
@@ -145,5 +146,46 @@ router.get('/get-team-members', authenticateToken, authorizeAdmin, async (req, r
     }
 });
 
+
+// Add a new law firm details (including personal, professional, and bank details)
+router.post('/add-law-firm-details', authenticateToken, authorizeAdmin, async (req, res) => {
+    const {
+        lawFirmDetails,
+        professionalDetails,
+        bankAccountDetails
+    } = req.body;
+
+    try {
+        // Create and save new law firm details
+        const newLawFirmDetails = new ImageForm({
+            lawFirmDetails,
+            professionalDetails,
+            bankAccountDetails,
+            createdBy: req.user.id,
+        });
+
+        await newLawFirmDetails.save();
+        res.status(201).json({ message: 'Law firm details added successfully', lawFirmDetails: newLawFirmDetails });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to add law firm details. Please try again later.' });
+    }
+});
+
+// API to get law firm details
+router.get('/get-law-firm-details', authenticateToken, async (req, res) => {
+    try {
+        const lawFirmDetails = await ImageForm.findOne({ createdBy: req.user.id }); // Find the details created by the logged-in admin
+        
+        if (!lawFirmDetails) {
+            return res.status(404).json({ message: 'Law firm details not found' });
+        }
+
+        res.status(200).json(lawFirmDetails);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve law firm details. Please try again later.' });
+    }
+});
 
 module.exports = router;
