@@ -8,7 +8,7 @@ const TeamMember = require('../models/TeamMember');
 const bcrypt = require('bcryptjs');
 const Case = require('../models/Case'); // Import Case model
 const ImageForm = require('../models/LawFirm');
-const ImageForm = require('../models/Client');
+const Client = require('../models/Client');
 
 // Add or update ChatGPT API key
 router.post('/set-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req, res) => {
