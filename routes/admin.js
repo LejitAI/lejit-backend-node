@@ -8,6 +8,7 @@ const TeamMember = require('../models/TeamMember');
 const bcrypt = require('bcryptjs');
 const Case = require('../models/Case'); // Import Case model
 const ImageForm = require('../models/LawFirm');
+const ImageForm = require('../models/Client');
 
 // Add or update ChatGPT API key
 router.post('/set-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req, res) => {
@@ -187,5 +188,74 @@ router.get('/get-law-firm-details', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Failed to retrieve law firm details. Please try again later.' });
     }
 });
+
+// API to get all case details
+router.get('/get-cases', authenticateToken, authorizeAdmin, async (req, res) => {
+    try {
+        // Retrieve all cases from the database
+        const cases = await Case.find({});
+        res.status(200).json(cases);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve cases. Please try again later.' });
+    }
+});
+
+
+// API to add client details
+router.post('/add-client', authenticateToken, authorizeAdmin, async (req, res) => {
+    const {
+        name,
+        dateOfBirth,
+        gender,
+        email,
+        mobile,
+        address,
+        profilePhoto,
+    } = req.body;
+
+    if (!name || !dateOfBirth || !gender || !email || !mobile || !address) {
+        return res.status(400).json({ message: 'Please fill in all required fields.' });
+    }
+
+    try {
+        // Create and save new client details
+        const newClient = new Client({
+            name,
+            dateOfBirth,
+            gender,
+            email,
+            mobile,
+            address,
+            profilePhoto,
+            createdBy: req.user.id,
+        });
+
+        await newClient.save();
+        res.status(201).json({ message: 'Client details saved successfully', client: newClient });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to save client details. Please try again later.' });
+    }
+});
+
+
+// API to get client details
+router.get('/get-client', authenticateToken, authorizeAdmin, async (req, res) => {
+    try {
+        const client = await Client.findOne({ createdBy: req.user.id }); // Get client details added by the logged-in admin
+        
+        if (!client) {
+            return res.status(404).json({ message: 'Client details not found' });
+        }
+
+        res.status(200).json(client);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve client details. Please try again later.' });
+    }
+});
+
+
 
 module.exports = router;
