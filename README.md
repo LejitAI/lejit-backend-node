@@ -82,40 +82,7 @@ Make sure you have the following installed on your system:
 
 ---
 
-## API Endpoints
 
-### Authentication
-
-| Method | Endpoint         | Description              |
-|--------|------------------|--------------------------|
-| POST   | `/api/auth/login`  | User login               |
-| POST   | `/api/auth/register` | User registration         |
-| POST   | `/api/auth/logout` | User logout              |
-
-### User Management
-
-| Method | Endpoint            | Description                      |
-|--------|---------------------|----------------------------------|
-| GET    | `/api/users`         | Get all users (admin only)       |
-| GET    | `/api/users/:id`     | Get user details by ID           |
-| PUT    | `/api/users/:id`     | Update user details              |
-| DELETE | `/api/users/:id`     | Delete user (admin only)         |
-
-### AI-Powered Chatbot
-
-| Method | Endpoint         | Description                      |
-|--------|------------------|----------------------------------|
-| POST   | `/api/chat/query` | Query LLM for legal assistance   |
-
-### Document Management
-
-| Method | Endpoint            | Description                      |
-|--------|---------------------|----------------------------------|
-| POST   | `/api/documents`     | Upload a legal document          |
-| GET    | `/api/documents/:id` | Retrieve a document by ID        |
-| DELETE | `/api/documents/:id` | Delete a document                |
-
----
 
 ## Technologies Used
 
