@@ -2,11 +2,12 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const UserSchema = new mongoose.Schema({
-    law_firm: { type: String, required: true },
-    username: { type: String, required: true},
+    law_firm: { type: String }, // Optional for citizens and corporates
+    username: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     role: { type: String, enum: ['lawyer', 'citizen'], default: 'citizen' },
+    userType: { type: String, enum: ['citizen', 'corporate', 'lawfirm'], required: true },
     validated: { type: Boolean, default: true } // Only validated users can chat
 });
 
