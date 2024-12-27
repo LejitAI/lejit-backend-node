@@ -1,66 +1,54 @@
-const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const teamMemberSchema = new mongoose.Schema({
-    personalDetails: {
-        name: String,
-        dateOfBirth: Date,
-        gender: String,
-        yearsOfExperience: Number,
-        mobile: String,
-        email: {
-            type: String,
-            required: true,
-            unique: true // Ensures email is unique for each team member
+module.exports = (sequelize, DataTypes) => {
+    const TeamMember = sequelize.define('TeamMember', {
+        personalDetails: {
+            type: DataTypes.JSONB,
+            allowNull: false
         },
-        address: {
-            line1: String,
-            line2: String,
-            city: String,
-            state: String,
-            country: String,
-            postalCode: String,
+        professionalDetails: {
+            type: DataTypes.JSONB,
+            allowNull: false
         },
-    },
-    professionalDetails: {
-        lawyerType: String,
-        governmentID: String,
-        degreeType: String,
-        degreeInstitution: String,
-        specialization: String,
-    },
-    bankAccountDetails: {
-        paymentMethod: String, // Card, Bank, or UPI
-        cardDetails: {
-            cardNumber: String,
-            expirationDate: String,
-            cvv: String,
-            saveCard: Boolean,
+        bankAccountDetails: {
+            type: DataTypes.JSONB,
+            allowNull: false
         },
-        bankDetails: {
-            accountNumber: String,
-            bankName: String,
-            ifscCode: String,
+        password: {
+            type: DataTypes.STRING,
+            allowNull: false
         },
-        upiId: String,
-    },
-    password: {
-        type: String,
-        required: true,
-        select: false // Prevents password from being returned in queries by default
-    },
-    createdAt: { type: Date, default: Date.now },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-});
+        createdBy: {
+            type: DataTypes.INTEGER,
+            references: {
+                model: 'Users',
+                key: 'id'
+            }
+        }
+    }, {
+        hooks: {
+            beforeSave: async (member) => {
+                if (member.changed('password')) {
+                    const salt = await bcrypt.genSalt(10);
+                    member.password = await bcrypt.hash(member.password, salt);
+                }
+            }
+        },
+        indexes: [
+            {
+                unique: true,
+                fields: [sequelize.literal('("personalDetails"->\'email\')')],
+                name: 'team_member_email_idx'
+            }
+        ]
+    });
 
-// Hash password before saving
-teamMemberSchema.pre('save', async function (next) {
-    if (!this.isModified('password')) return next();
-    this.password = await bcrypt.hash(this.password, 10);
-    next();
-});
+    TeamMember.associate = (models) => {
+        TeamMember.belongsTo(models.User, {
+            foreignKey: 'createdBy',
+            as: 'creator'
+        });
+    };
 
-// Create unique index on email
-teamMemberSchema.index({ "personalDetails.email": 1 }, { unique: true });
-
-module.exports = mongoose.model('TeamMember', teamMemberSchema);
+    return TeamMember;
+};

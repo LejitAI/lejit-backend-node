@@ -1,27 +1,59 @@
-const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const UserSchema = new mongoose.Schema({
-    law_firm: { type: String }, // Optional for citizens and corporates
-    username: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: { type: String, enum: ['lawyer', 'citizen'], default: 'citizen' },
-    userType: { type: String, enum: ['citizen', 'corporate', 'lawfirm'], required: true },
-    validated: { type: Boolean, default: true } // Only validated users can chat
-});
+module.exports = (sequelize, DataTypes) => {
+    const User = sequelize.define('User', {
+        law_firm: {
+            type: DataTypes.STRING
+        },
+        username: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
+        email: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            unique: true,
+            validate: {
+                isEmail: true
+            }
+        },
+        password: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
+        role: {
+            type: DataTypes.ENUM('lawyer', 'citizen'),
+            defaultValue: 'citizen'
+        },
+        userType: {
+            type: DataTypes.ENUM('citizen', 'corporate', 'lawfirm'),
+            allowNull: false
+        },
+        validated: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        }
+    }, {
+        hooks: {
+            beforeSave: async (user) => {
+                if (user.changed('password')) {
+                    const salt = await bcrypt.genSalt(10);
+                    user.password = await bcrypt.hash(user.password, salt);
+                }
+            }
+        }
+    });
 
-// Hash the password before saving
-UserSchema.pre('save', async function(next) {
-    if (!this.isModified('password')) return next();
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-});
+    User.prototype.matchPassword = async function(enteredPassword) {
+        return await bcrypt.compare(enteredPassword, this.password);
+    };
 
-// Method to match password
-UserSchema.methods.matchPassword = async function(enteredPassword) {
-    return await bcrypt.compare(enteredPassword, this.password);
+    User.associate = (models) => {
+        User.hasMany(models.Case, {
+            foreignKey: 'createdBy',
+            as: 'cases'
+        });
+    };
+
+    return User;
 };
-
-module.exports = mongoose.model('User', UserSchema);
