@@ -1,44 +1,52 @@
 // models/Case.js
-const mongoose = require('mongoose');
+module.exports = (sequelize, DataTypes) => {
+    const Case = sequelize.define('Case', {
+        title: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
+        startingDate: {
+            type: DataTypes.DATE,
+            allowNull: false
+        },
+        caseType: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
+        client: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
+        oppositeClient: {
+            type: DataTypes.STRING
+        },
+        caseWitness: {
+            type: DataTypes.STRING
+        },
+        caseDescription: {
+            type: DataTypes.TEXT
+        },
+        documents: {
+            type: DataTypes.ARRAY(DataTypes.STRING)
+        },
+        createdBy: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            references: {
+                model: 'Users',
+                key: 'id'
+            }
+        }
+    }, {
+        timestamps: true
+    });
 
-const CaseSchema = new mongoose.Schema({
-    title: {
-        type: String,
-        required: true,
-    },
-    startingDate: {
-        type: Date,
-        required: true,
-    },
-    caseType: {
-        type: String,
-        required: true,
-    },
-    client: {
-        type: String,
-        required: true,
-    },
-    oppositeClient: {
-        type: String,
-    },
-    caseWitness: {
-        type: String,
-    },
-    caseDescription: {
-        type: String,
-    },
-    documents: [{
-        type: String,
-    }],
-    createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true,
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now,
-    },
-});
+    Case.associate = (models) => {
+        Case.belongsTo(models.User, {
+            foreignKey: 'createdBy',
+            as: 'creator'
+        });
+    };
 
-module.exports = mongoose.model('Case', CaseSchema);
+    return Case;
+};
