@@ -1,14 +1,8 @@
-module.exports = (sequelize, DataTypes) => {
-    const Settings = sequelize.define('Settings', {
-        chatgptApiKey: {
-            type: DataTypes.STRING,
-            allowNull: true
-        },
-        updatedAt: {
-            type: DataTypes.DATE,
-            defaultValue: DataTypes.NOW
-        }
-    });
+const mongoose = require('mongoose');
 
-    return Settings;
-};
+const SettingsSchema = new mongoose.Schema({
+    chatgptApiKey: { type: String, required: false },
+    updatedAt: { type: Date, default: Date.now },
+});
+
+module.exports = mongoose.model('Settings', SettingsSchema);

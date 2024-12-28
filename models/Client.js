@@ -1,48 +1,15 @@
-module.exports = (sequelize, DataTypes) => {
-    const Client = sequelize.define('Client', {
-        name: {
-            type: DataTypes.STRING,
-            allowNull: false
-        },
-        dateOfBirth: {
-            type: DataTypes.DATE,
-            allowNull: false
-        },
-        gender: {
-            type: DataTypes.STRING,
-            allowNull: false
-        },
-        email: {
-            type: DataTypes.STRING,
-            allowNull: false
-        },
-        mobile: {
-            type: DataTypes.STRING,
-            allowNull: false
-        },
-        address: {
-            type: DataTypes.STRING,
-            allowNull: false
-        },
-        profilePhoto: {
-            type: DataTypes.STRING
-        },
-        createdBy: {
-            type: DataTypes.INTEGER,
-            allowNull: false,
-            references: {
-                model: 'Users',
-                key: 'id'
-            }
-        }
-    });
+const mongoose = require('mongoose');
 
-    Client.associate = (models) => {
-        Client.belongsTo(models.User, {
-            foreignKey: 'createdBy',
-            as: 'creator'
-        });
-    };
+const clientSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    dateOfBirth: { type: Date, required: true },
+    gender: { type: String, required: true },
+    email: { type: String, required: true },
+    mobile: { type: String, required: true },
+    address: { type: String, required: true },
+    profilePhoto: { type: String }, // URL or path to the profile photo
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+}, { timestamps: true });
 
-    return Client;
-};
+const Client = mongoose.model('Client', clientSchema);
+module.exports = Client;
