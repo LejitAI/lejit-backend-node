@@ -97,7 +97,7 @@ router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, r
 
 
 // API to add a new case by an admin
-router.post('/add-case', authenticateToken, authorizeAdmin, async (req, res) => {
+router.post('/add-case', async (req, res) => {
     const {
         title,
         startingDate,
@@ -124,7 +124,7 @@ router.post('/add-case', authenticateToken, authorizeAdmin, async (req, res) => 
             caseWitness,
             caseDescription,
             documents,
-            createdBy: req.user.id,
+            // createdBy: req.user.id,
         });
 
         await newCase.save();
@@ -190,7 +190,7 @@ router.get('/get-law-firm-details', authenticateToken, async (req, res) => {
 });
 
 // API to get all case details
-router.get('/get-cases', authenticateToken, authorizeAdmin, async (req, res) => {
+router.get('/get-cases', async (req, res) => {
     try {
         // Retrieve all cases from the database
         const cases = await Case.find({});
@@ -203,7 +203,7 @@ router.get('/get-cases', authenticateToken, authorizeAdmin, async (req, res) => 
 
 
 // API to add client details
-router.post('/add-client', authenticateToken, authorizeAdmin, async (req, res) => {
+router.post('/add-client', async (req, res) => {
     const {
         name,
         dateOfBirth,
@@ -228,7 +228,7 @@ router.post('/add-client', authenticateToken, authorizeAdmin, async (req, res) =
             mobile,
             address,
             profilePhoto,
-            createdBy: req.user.id,
+            // createdBy: req.user.id,
         });
 
         await newClient.save();
@@ -241,9 +241,9 @@ router.post('/add-client', authenticateToken, authorizeAdmin, async (req, res) =
 
 
 // API to get client details
-router.get('/get-client', authenticateToken, authorizeAdmin, async (req, res) => {
+router.get('/get-client', async (req, res) => {
     try {
-        const client = await Client.findOne({ createdBy: req.user.id }); // Get client details added by the logged-in admin
+        const client = await Client.find({}); // Get client details added by the logged-in admin
         
         if (!client) {
             return res.status(404).json({ message: 'Client details not found' });

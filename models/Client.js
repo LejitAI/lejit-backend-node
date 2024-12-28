@@ -6,10 +6,16 @@ const clientSchema = new mongoose.Schema({
     gender: { type: String, required: true },
     email: { type: String, required: true },
     mobile: { type: String, required: true },
-    address: { type: String, required: true },
-    profilePhoto: { type: String }, // URL or path to the profile photo
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-}, { timestamps: true });
+    address: {
+        addressLine1: { type: String, required: true },
+        addressLine2: { type: String },
+        city: { type: String, required: true },
+        state: { type: String, required: true },
+        postalCode: { type: String, required: true },
+        country: { type: String, required: true },
+    },
+    profilePhoto: { type: String }, // Optional
+});
 
 const Client = mongoose.model('Client', clientSchema);
 module.exports = Client;
