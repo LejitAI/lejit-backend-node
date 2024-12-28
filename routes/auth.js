@@ -7,9 +7,13 @@ const router = express.Router();
 
 // Register a new user
 router.post('/register', async (req, res) => {
-    const { law_firm, username, email, password } = req.body;
+    const { userType, law_firm, username, email, password } = req.body;
 
     try {
+        if (!userType) {
+            return res.status(400).json({ message: 'User type is required' });
+        }
+
         // Check if email already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
@@ -17,7 +21,18 @@ router.post('/register', async (req, res) => {
         }
 
         // Create and save new user
-        const newUser = new User({ law_firm, username, email, password });
+        let newUser;
+        if (userType === 'lawfirm') {
+            if (!law_firm) {
+                return res.status(400).json({ message: 'Law firm details are required for lawfirm users' });
+            }
+            newUser = new User({ law_firm, username, email, password, userType });
+        } else if (userType === 'citizen' || userType === 'corporate') {
+            newUser = new User({ username, email, password, userType });
+        } else {
+            return res.status(400).json({ message: 'Invalid user type' });
+        }
+
         await newUser.save();
         res.status(201).json({ message: 'User registered successfully' });
     } catch (error) {
@@ -43,8 +58,13 @@ router.post('/login', async (req, res) => {
         }
 
         // Generate token
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.json({ token });
+        const token = jwt.sign(
+            { id: user._id, userType: user.userType },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+        
+        res.json({ token, userType: user.userType });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to log in. Please try again later.' });
