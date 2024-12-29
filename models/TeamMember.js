@@ -21,6 +21,7 @@ const teamMemberSchema = new mongoose.Schema({
             country: String,
             postalCode: String,
         },
+        photo: String, // New field to store the photo URL
     },
     professionalDetails: {
         lawyerType: String,
