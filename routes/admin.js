@@ -135,6 +135,25 @@ router.post('/add-case', async (req, res) => {
     }
 });
 
+// API to delete a case
+router.delete('/delete-case/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const deletedCase = await Case.findByIdAndDelete(id);
+
+        if (!deletedCase) {
+            return res.status(404).json({ message: 'Case not found.' });
+        }
+
+        res.status(200).json({ message: 'Case deleted successfully.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to delete case. Please try again later.' });
+    }
+});
+
+
 
 // API to get all team members
 router.get('/get-team-members', authenticateToken, authorizeAdmin, async (req, res) => {
