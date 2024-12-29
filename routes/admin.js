@@ -142,7 +142,7 @@ router.post('/add-case', async (req, res) => {
             caseWitness,
             caseDescription,
             documents,
-            createdBy: req.user.id,
+            //createdBy: req.user.id,
         });
 
         await newCase.save();
