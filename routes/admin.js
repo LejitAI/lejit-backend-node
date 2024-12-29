@@ -293,7 +293,7 @@ router.post('/add-client', async (req, res) => {
             mobile,
             address,
             profilePhoto,
-            // createdBy: req.user.id,
+            createdBy: req.user.id,
         });
 
         await newClient.save();
