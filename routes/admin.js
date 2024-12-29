@@ -9,6 +9,28 @@ const bcrypt = require('bcryptjs');
 const Case = require('../models/Case'); // Import Case model
 const ImageForm = require('../models/LawFirm');
 const Client = require('../models/Client');
+const multer = require('multer');
+const path = require('path');
+
+// Configure multer
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/photos'); // Directory to store photos
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}_${file.originalname}`);
+    },
+});
+const upload = multer({ storage });
+
+// API for photo upload
+router.post('/upload-photo', authenticateToken, upload.single('photo'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+    }
+    res.status(200).json({ photoUrl: `/uploads/photos/${req.file.filename}` });
+});
+
 
 // Add or update ChatGPT API key
 router.post('/set-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req, res) => {
@@ -73,9 +95,8 @@ router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, r
     } = req.body;
 
     try {
-        // Create and save new team member
         const newTeamMember = new TeamMember({
-            personalDetails,
+            personalDetails: { ...personalDetails },
             professionalDetails,
             bankAccountDetails,
             password,
@@ -85,14 +106,12 @@ router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, r
         await newTeamMember.save();
         res.status(201).json({ message: 'Team member added successfully', teamMember: newTeamMember });
     } catch (error) {
-        // Handle unique email constraint error
         if (error.code === 11000 && error.keyPattern && error.keyPattern['personalDetails.email']) {
             return res.status(400).json({ message: 'Email is already in use. Please use a different email.' });
         }
         console.error(error);
         res.status(500).json({ message: 'Failed to add team member. Please try again later.' });
     }
-    
 });
 
 // API to delete a team member
