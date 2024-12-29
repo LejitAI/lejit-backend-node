@@ -174,7 +174,7 @@ router.post('/add-law-firm-details', authenticateToken, authorizeAdmin, async (r
 });
 
 // API to get law firm details
-router.get('/get-law-firm-details', authenticateToken, async (req, res) => {
+router.get('/get-law-firm-detils', authenticateToken, async (req, res) => {
     try {
         const lawFirmDetails = await ImageForm.findOne({ createdBy: req.user.id }); // Find the details created by the logged-in admin
         
