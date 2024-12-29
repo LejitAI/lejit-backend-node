@@ -95,6 +95,24 @@ router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, r
     
 });
 
+// API to delete a team member
+router.delete('/delete-team-member/:id', authenticateToken, authorizeAdmin, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const deletedMember = await TeamMember.findByIdAndDelete(id);
+
+        if (!deletedMember) {
+            return res.status(404).json({ message: 'Team member not found.' });
+        }
+
+        res.status(200).json({ message: 'Team member deleted successfully.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to delete team member. Please try again later.' });
+    }
+});
+
 
 // API to add a new case by an admin
 router.post('/add-case', async (req, res) => {
