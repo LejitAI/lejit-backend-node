@@ -12,24 +12,6 @@ const Client = require('../models/Client');
 const multer = require('multer');
 const path = require('path');
 
-// Configure multer
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/photos'); // Directory to store photos
-    },
-    filename: (req, file, cb) => {
-        cb(null, `${Date.now()}_${file.originalname}`);
-    },
-});
-const upload = multer({ storage });
-
-// API for photo upload
-router.post('/upload-photo', authenticateToken, upload.single('photo'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ message: 'No file uploaded' });
-    }
-    res.status(200).json({ photoUrl: `/uploads/photos/${req.file.filename}` });
-});
 
 
 // Add or update ChatGPT API key
