@@ -93,6 +93,5 @@ const imageFormSchema = new mongoose.Schema({
 });
 
 // Create unique index on email
-imageFormSchema.index({ "lawFirmDetails.contactInfo.email": 1 }, { unique: true });
 
 module.exports = mongoose.model('ImageForm', imageFormSchema);
