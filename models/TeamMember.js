@@ -60,7 +60,4 @@ teamMemberSchema.pre('save', async function (next) {
     next();
 });
 
-// Create unique index on email
-teamMemberSchema.index({ "personalDetails.email": 1 }, { unique: true });
-
 module.exports = mongoose.model('TeamMember', teamMemberSchema);
