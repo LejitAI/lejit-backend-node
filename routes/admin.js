@@ -189,6 +189,34 @@ router.get('/get-law-firm-details', authenticateToken, async (req, res) => {
     }
 });
 
+// Update law firm details
+router.put('/update-law-firm-details', authenticateToken, async (req, res) => {
+    try {
+        const { lawFirmDetails, professionalDetails, bankAccountDetails } = req.body;
+
+        // Find and update the law firm details for the logged-in admin
+        const updatedDetails = await ImageForm.findOneAndUpdate(
+            { createdBy: req.user.id }, // Match the user ID of the logged-in admin
+            {
+                lawFirmDetails,
+                professionalDetails,
+                bankAccountDetails,
+            },
+            { new: true } // Return the updated document after modification
+        );
+
+        if (!updatedDetails) {
+            return res.status(404).json({ message: 'Law firm details not found' });
+        }
+
+        res.status(200).json({ message: 'Law firm details updated successfully', updatedDetails });
+    } catch (error) {
+        console.error('Error updating law firm details:', error);
+        res.status(500).json({ message: 'Failed to update law firm details. Please try again later.' });
+    }
+});
+
+
 // API to get all case details
 router.get('/get-cases', async (req, res) => {
     try {
