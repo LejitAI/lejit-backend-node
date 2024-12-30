@@ -2,15 +2,20 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const UserSchema = new mongoose.Schema({
-    law_firm: { type: String, required: true },
-    username: { type: String, required: true},
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: { type: String, enum: ['lawyer', 'citizen'], default: 'citizen' },
-    validated: { type: Boolean, default: true } // Only validated users can chat
-});
+    role: { 
+        type: String, 
+        enum: ['citizen', 'law_firm', 'corporate'], 
+        required: true 
+    },
+    username: { type: String, required: true }, // Common for all
+    email: { type: String, required: true, unique: true }, // Common for all
+    password: { type: String, required: true }, // Common for all
+    company_name: { type: String }, // Required for corporate
+    law_firm_name: { type: String }, // Required for law firm
+    validated: { type: Boolean, default: false }, // Admin validation for all users
+}, { timestamps: true });
 
-// Hash the password before saving
+// Hash password before saving
 UserSchema.pre('save', async function(next) {
     if (!this.isModified('password')) return next();
     const salt = await bcrypt.genSalt(10);
@@ -18,7 +23,7 @@ UserSchema.pre('save', async function(next) {
     next();
 });
 
-// Method to match password
+// Method to compare passwords
 UserSchema.methods.matchPassword = async function(enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
