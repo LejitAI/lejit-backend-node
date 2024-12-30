@@ -280,7 +280,7 @@ router.get('/get-cases', authenticateToken, async (req, res) => {
 
 
 // API to add client details
-router.post('/add-client', async (req, res) => {
+router.post('/add-client', authenticateToken, async (req, res) => {
     const {
         name,
         dateOfBirth,
@@ -305,7 +305,7 @@ router.post('/add-client', async (req, res) => {
             mobile,
             address,
             profilePhoto,
-            createdBy: req.user.id,
+            createdBy: req.user.id, // Associate the logged-in user
         });
 
         await newClient.save();
@@ -318,20 +318,43 @@ router.post('/add-client', async (req, res) => {
 
 
 // API to get client details
-router.get('/get-client', async (req, res) => {
+router.get('/get-client', authenticateToken, async (req, res) => {
     try {
-        const client = await Client.find({}); // Get client details added by the logged-in admin
+        // Retrieve clients created by the logged-in user
+        const clients = await Client.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
         
-        if (!client) {
-            return res.status(404).json({ message: 'Client details not found' });
+        if (!clients || clients.length === 0) {
+            return res.status(200).json([]); // Return an empty array if no clients are found
         }
 
-        res.status(200).json(client);
+        res.status(200).json(clients);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to retrieve client details. Please try again later.' });
     }
 });
+
+router.delete('/delete-client/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Find and delete the client created by the logged-in user
+        const deletedClient = await Client.findOneAndDelete({
+            _id: id,
+            createdBy: req.user.id, // Ensure the client belongs to the logged-in user
+        });
+
+        if (!deletedClient) {
+            return res.status(404).json({ message: 'Client not found or access denied.' });
+        }
+
+        res.status(200).json({ message: 'Client deleted successfully.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to delete client. Please try again later.' });
+    }
+});
+
 
 
 
