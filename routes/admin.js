@@ -96,14 +96,18 @@ router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, r
 });
 
 // API to delete a team member
-router.delete('/delete-team-member/:id', authenticateToken, authorizeAdmin, async (req, res) => {
+router.delete('/delete-team-member/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     try {
-        const deletedMember = await TeamMember.findByIdAndDelete(id);
+        // Find and delete the team member created by the logged-in user
+        const deletedMember = await TeamMember.findOneAndDelete({
+            _id: id,
+            createdBy: req.user.id
+        });
 
         if (!deletedMember) {
-            return res.status(404).json({ message: 'Team member not found.' });
+            return res.status(404).json({ message: 'Team member not found or access denied.' });
         }
 
         res.status(200).json({ message: 'Team member deleted successfully.' });
