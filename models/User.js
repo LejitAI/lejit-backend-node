@@ -12,7 +12,7 @@ const UserSchema = new mongoose.Schema({
     password: { type: String, required: true }, // Common for all
     company_name: { type: String }, // Required for corporate
     law_firm_name: { type: String }, // Required for law firm
-    validated: { type: Boolean, default: false }, // Admin validation for all users
+    validated: { type: Boolean, default: true }, // Admin validation for all users
 }, { timestamps: true });
 
 // Hash password before saving
