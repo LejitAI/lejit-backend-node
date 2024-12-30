@@ -1,7 +1,6 @@
 // routes/admin.js
 const express = require('express');
 const Settings = require('../models/Settings');
-const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
 const router = express.Router();
 const User = require('../models/User');
 const TeamMember = require('../models/TeamMember');
@@ -11,7 +10,7 @@ const ImageForm = require('../models/LawFirm');
 const Client = require('../models/Client');
 
 // Add or update ChatGPT API key
-router.post('/set-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req, res) => {
+router.post('/set-chatgpt-api-key', authenticateToken, async (req, res) => {
     const { chatgptApiKey } = req.body;
 
     if (!chatgptApiKey) {
@@ -37,7 +36,7 @@ router.post('/set-chatgpt-api-key', authenticateToken, authorizeAdmin, async (re
     }
 });
 
-router.get('/get-users', authenticateToken, authorizeAdmin, async (req, res) => {
+router.get('/get-users', authenticateToken, async (req, res) => {
     try {
         const users = await User.find({}, 'username _id validated'); // Only select the fields we need
         res.status(200).json(users);
@@ -49,7 +48,7 @@ router.get('/get-users', authenticateToken, authorizeAdmin, async (req, res) => 
 
 
 // Get the ChatGPT API key (admin only)
-router.get('/get-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req, res) => {
+router.get('/get-chatgpt-api-key', authenticateToken, async (req, res) => {
     try {
         const settings = await Settings.findOne();
         if (!settings || !settings.chatgptApiKey) {
@@ -192,7 +191,7 @@ router.get('/get-team-members', authenticateToken, async (req, res) => {
 
 
 // Add a new law firm details (including personal, professional, and bank details)
-router.post('/add-law-firm-details', authenticateToken, authorizeAdmin, async (req, res) => {
+router.post('/add-law-firm-details', authenticateToken, async (req, res) => {
     const {
         lawFirmDetails,
         professionalDetails,
