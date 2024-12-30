@@ -119,7 +119,7 @@ router.delete('/delete-team-member/:id', authenticateToken, async (req, res) => 
 
 
 // API to add a new case by an admin
-router.post('/add-case', async (req, res) => {
+router.post('/add-case', authenticateToken, async (req, res) => {
     const {
         title,
         startingDate,
@@ -146,7 +146,7 @@ router.post('/add-case', async (req, res) => {
             caseWitness,
             caseDescription,
             documents,
-            //createdBy: req.user.id,
+            createdBy: req.user.id, // Associate the logged-in user
         });
 
         await newCase.save();
@@ -158,14 +158,18 @@ router.post('/add-case', async (req, res) => {
 });
 
 // API to delete a case
-router.delete('/delete-case/:id', async (req, res) => {
+router.delete('/delete-case/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     try {
-        const deletedCase = await Case.findByIdAndDelete(id);
+        // Find and delete the case created by the logged-in user
+        const deletedCase = await Case.findOneAndDelete({
+            _id: id,
+            createdBy: req.user.id // Ensure the case belongs to the logged-in user
+        });
 
         if (!deletedCase) {
-            return res.status(404).json({ message: 'Case not found.' });
+            return res.status(404).json({ message: 'Case not found or access denied.' });
         }
 
         res.status(200).json({ message: 'Case deleted successfully.' });
@@ -174,6 +178,7 @@ router.delete('/delete-case/:id', async (req, res) => {
         res.status(500).json({ message: 'Failed to delete case. Please try again later.' });
     }
 });
+
 
 
 
@@ -261,16 +266,17 @@ router.put('/update-law-firm-details', authenticateToken, async (req, res) => {
 
 
 // API to get all case details
-router.get('/get-cases', async (req, res) => {
+router.get('/get-cases', authenticateToken, async (req, res) => {
     try {
-        // Retrieve all cases from the database
-        const cases = await Case.find({});
+        // Retrieve cases created by the logged-in user
+        const cases = await Case.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
         res.status(200).json(cases);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to retrieve cases. Please try again later.' });
     }
 });
+
 
 
 // API to add client details
