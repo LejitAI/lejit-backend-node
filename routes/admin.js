@@ -3,6 +3,7 @@ const express = require('express');
 const Settings = require('../models/Settings');
 const router = express.Router();
 const User = require('../models/User');
+const { authenticateToken } = require('../middleware/auth');
 const TeamMember = require('../models/TeamMember');
 const bcrypt = require('bcryptjs');
 const Case = require('../models/Case'); // Import Case model
