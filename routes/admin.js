@@ -448,6 +448,7 @@ router.delete('/delete-client/:id', authenticateToken, async (req, res) => {
 });
 
 // Book an appointment
+// Book an appointment
 router.post("/book-appointment", authenticateToken, async (req, res) => {
   const { clientId, lawyerId, lawFirmId, appointmentDate, appointmentTime, caseNotes } = req.body;
 
@@ -456,6 +457,31 @@ router.post("/book-appointment", authenticateToken, async (req, res) => {
   }
 
   try {
+    // Check if lawyer exists
+    const lawyer = await TeamMember.findById(lawyerId);
+    if (!lawyer) {
+      return res.status(404).json({ message: "Lawyer not found." });
+    }
+
+    // Check if client exists
+    const client = await Client.findById(clientId);
+    if (!client) {
+      return res.status(404).json({ message: "Client not found." });
+    }
+
+    // Check for conflicting appointments
+    const conflictingAppointment = await Appointment.findOne({
+      lawyerId,
+      appointmentDate: new Date(appointmentDate),
+      appointmentTime,
+      status: { $in: ["Pending", "Confirmed"] },
+    });
+
+    if (conflictingAppointment) {
+      return res.status(400).json({ message: "Time slot is already booked." });
+    }
+
+    // Create and save appointment
     const newAppointment = new Appointment({
       clientId,
       lawyerId,
@@ -478,7 +504,9 @@ router.get("/lawyer-appointments/:lawyerId", authenticateToken, async (req, res)
   const { lawyerId } = req.params;
 
   try {
-    const appointments = await Appointment.find({ lawyerId, status: "Pending" }).populate("clientId", "name email");
+    const appointments = await Appointment.find({ lawyerId, status: "Pending" })
+      .populate("clientId", "name email")
+      .populate("lawFirmId", "law_firm_name");
     res.status(200).json(appointments);
   } catch (error) {
     console.error("Error fetching appointments:", error);
