@@ -9,6 +9,8 @@ const bcrypt = require('bcryptjs');
 const Case = require('../models/Case'); // Import Case model
 const ImageForm = require('../models/LawFirm');
 const Client = require('../models/Client');
+const Appointment = require("../models/Appointment");
+
 
 // Add or update ChatGPT API key
 router.post('/set-chatgpt-api-key', authenticateToken, async (req, res) => {
@@ -443,6 +445,45 @@ router.delete('/delete-client/:id', authenticateToken, async (req, res) => {
         console.error(error);
         res.status(500).json({ message: 'Failed to delete client. Please try again later.' });
     }
+});
+
+// Book an appointment
+router.post("/book-appointment", authenticateToken, async (req, res) => {
+  const { clientId, lawyerId, lawFirmId, appointmentDate, appointmentTime, caseNotes } = req.body;
+
+  if (!clientId || !lawyerId || !lawFirmId || !appointmentDate || !appointmentTime) {
+    return res.status(400).json({ message: "Missing required fields." });
+  }
+
+  try {
+    const newAppointment = new Appointment({
+      clientId,
+      lawyerId,
+      lawFirmId,
+      appointmentDate: new Date(appointmentDate),
+      appointmentTime,
+      caseNotes,
+    });
+
+    await newAppointment.save();
+    res.status(201).json({ message: "Appointment booked successfully", appointment: newAppointment });
+  } catch (error) {
+    console.error("Error booking appointment:", error);
+    res.status(500).json({ message: "Failed to book appointment. Please try again later." });
+  }
+});
+
+// Get pending appointments for a lawyer
+router.get("/lawyer-appointments/:lawyerId", authenticateToken, async (req, res) => {
+  const { lawyerId } = req.params;
+
+  try {
+    const appointments = await Appointment.find({ lawyerId, status: "Pending" }).populate("clientId", "name email");
+    res.status(200).json(appointments);
+  } catch (error) {
+    console.error("Error fetching appointments:", error);
+    res.status(500).json({ message: "Failed to fetch appointments." });
+  }
 });
 
 
