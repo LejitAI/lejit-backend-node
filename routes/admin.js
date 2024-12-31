@@ -10,6 +10,7 @@ const Case = require('../models/Case'); // Import Case model
 const ImageForm = require('../models/LawFirm');
 const Client = require('../models/Client');
 const Appointment = require("../models/Appointment");
+const { Op } = require('sequelize');
 
 
 // Add or update ChatGPT API key
@@ -39,9 +40,12 @@ router.post('/set-chatgpt-api-key', authenticateToken, async (req, res) => {
     }
 });
 
+// Get all users
 router.get('/get-users', authenticateToken, async (req, res) => {
     try {
-        const users = await User.find({}, 'username _id validated'); // Only select the fields we need
+        const users = await User.findAll({
+            attributes: ['username', 'id', 'validated']
+        });
         res.status(200).json(users);
     } catch (error) {
         console.error(error);
@@ -75,8 +79,7 @@ router.post('/add-team-member', authenticateToken, async (req, res) => {
     } = req.body;
 
     try {
-        // Create and save new team member
-        const newTeamMember = new TeamMember({
+        const newTeamMember = await TeamMember.create({
             personalDetails,
             professionalDetails,
             bankAccountDetails,
@@ -84,17 +87,14 @@ router.post('/add-team-member', authenticateToken, async (req, res) => {
             createdBy: req.user.id,
         });
 
-        await newTeamMember.save();
         res.status(201).json({ message: 'Team member added successfully', teamMember: newTeamMember });
     } catch (error) {
-        // Handle unique email constraint error
-        if (error.code === 11000 && error.keyPattern && error.keyPattern['personalDetails.email']) {
-            return res.status(400).json({ message: 'Email is already in use. Please use a different email.' });
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return res.status(400).json({ message: 'Email is already in use' });
         }
         console.error(error);
-        res.status(500).json({ message: 'Failed to add team member. Please try again later.' });
+        res.status(500).json({ message: 'Failed to add team member' });
     }
-    
 });
 
 // API to delete a team member
@@ -277,12 +277,15 @@ router.delete('/delete-case/:id', authenticateToken, async (req, res) => {
 // API to get all team members
 router.get('/get-team-members', authenticateToken, async (req, res) => {
     try {
-        // Fetch team members created by the logged-in user
-        const teamMembers = await TeamMember.find({ createdBy: req.user.id }, '-password').sort({ createdAt: -1 });
+        const teamMembers = await TeamMember.findAll({
+            where: { createdBy: req.user.id },
+            attributes: { exclude: ['password'] },
+            order: [['createdAt', 'DESC']]
+        });
         res.status(200).json(teamMembers);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve team members. Please try again later.' });
+        res.status(500).json({ message: 'Failed to retrieve team members' });
     }
 });
 

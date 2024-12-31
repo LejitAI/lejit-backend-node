@@ -22,7 +22,7 @@ router.post('/register', async (req, res) => {
         }
 
         // Check if email already exists
-        const existingUser = await User.findOne({ email });
+        const existingUser = await User.findOne({ where: { email } });
         if (existingUser) {
             return res.status(400).json({ message: 'Email or Username is already registered' });
         }
@@ -37,16 +37,15 @@ router.post('/register', async (req, res) => {
         }
 
         // Create and save new user
-        const newUser = new User({
+        const newUser = await User.create({
             role,
             username,
             email,
             password,
-            law_firm_name: role === 'law_firm' ? law_firm_name : undefined,
-            company_name: role === 'corporate' ? company_name : undefined,
+            law_firm_name: role === 'law_firm' ? law_firm_name : null,
+            company_name: role === 'corporate' ? company_name : null,
         });
 
-        await newUser.save();
         res.status(201).json({ message: `${role} registered successfully` });
     } catch (error) {
         console.error(error);
@@ -65,7 +64,7 @@ router.post('/login', async (req, res) => {
         }
 
         // Check if user exists
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ where: { email } });
         if (!user) {
             return res.status(401).json({ message: 'User not found. Please register first.' });
         }
@@ -76,7 +75,7 @@ router.post('/login', async (req, res) => {
         }
 
         // Generate token
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
         res.json({ token, role: user.role });
     } catch (error) {
         console.error(error);
@@ -87,7 +86,9 @@ router.post('/login', async (req, res) => {
 // Fetch User Profile (Shared for all roles)
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select('-password');
+        const user = await User.findByPk(req.user.id, {
+            attributes: { exclude: ['password'] }
+        });
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -102,14 +103,13 @@ router.get('/profile', authenticateToken, async (req, res) => {
 router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req, res) => {
     try {
         // Find user by ID
-        const user = await User.findById(req.params.id);
+        const user = await User.findByPk(req.params.id);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
         // Update validation status
-        user.validated = true;
-        await user.save();
+        await user.update({ validated: true });
         res.json({ message: `${user.role} validated successfully` });
     } catch (error) {
         console.error(error);
