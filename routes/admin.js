@@ -142,7 +142,23 @@ router.get('/get-team-members-by-law-firm/:lawFirmId', authenticateToken, async 
     }
 });
 
+//get all law firms
+// routes/admin.js
+router.get('/get-all-law-firms', authenticateToken, async (req, res) => {
+    try {
+        // Fetch all users with the 'law_firm' role
+        const lawFirms = await User.find({ role: 'law_firm' }, 'law_firm_name email validated');
+        
+        if (!lawFirms || lawFirms.length === 0) {
+            return res.status(404).json({ message: 'No law firms found.' });
+        }
 
+        res.status(200).json(lawFirms);
+    } catch (error) {
+        console.error('Error fetching law firms:', error);
+        res.status(500).json({ message: 'Failed to fetch law firms. Please try again later.' });
+    }
+});
 
 
 // API to add a new case by an admin
