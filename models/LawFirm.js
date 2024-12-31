@@ -1,3 +1,4 @@
+//models/LawFirm.js
 const mongoose = require('mongoose');
 
 const imageFormSchema = new mongoose.Schema({

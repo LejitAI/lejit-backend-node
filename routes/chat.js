@@ -1,3 +1,4 @@
+//routes/chat.js
 const express = require('express');
 const Settings = require('../models/Settings');
 const { authenticateToken } = require('../middleware/auth');
