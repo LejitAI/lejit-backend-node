@@ -117,6 +117,26 @@ router.delete('/delete-team-member/:id', authenticateToken, async (req, res) => 
     }
 });
 
+// API to get team member details by ID
+router.get('/get-team-member-details/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Find the team member by ID
+        const teamMember = await TeamMember.findById(id).select('-password');
+
+        if (!teamMember) {
+            return res.status(404).json({ message: 'Team member not found.' });
+        }
+
+        res.status(200).json(teamMember);
+    } catch (error) {
+        console.error('Error fetching team member details:', error);
+        res.status(500).json({ message: 'Failed to fetch team member details. Please try again later.' });
+    }
+});
+
+
 // routes/admin.js
 router.get('/get-law-firms', authenticateToken, async (req, res) => {
     try {
