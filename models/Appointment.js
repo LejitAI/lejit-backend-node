@@ -1,15 +1,36 @@
-// models/Appointment.js
-const mongoose = require("mongoose");
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/db');
 
-const appointmentSchema = new mongoose.Schema({
-  clientId: { type: mongoose.Schema.Types.ObjectId, ref: "Client", required: true },
-  lawyerId: { type: mongoose.Schema.Types.ObjectId, ref: "TeamMember", required: true },
-  lawFirmId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  appointmentDate: { type: Date, required: true },
-  appointmentTime: { type: String, required: true }, // e.g., "3:00 PM"
-  caseNotes: { type: String },
-  status: { type: String, enum: ["Pending", "Confirmed", "Rejected"], default: "Pending" },
-  createdAt: { type: Date, default: Date.now },
+const Appointment = sequelize.define('Appointment', {
+  clientId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  lawyerId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  lawFirmId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  appointmentDate: {
+    type: DataTypes.DATEONLY,
+    allowNull: false,
+  },
+  appointmentTime: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  caseNotes: {
+    type: DataTypes.TEXT,
+  },
+  status: {
+    type: DataTypes.ENUM('Pending', 'Confirmed', 'Rejected'),
+    defaultValue: 'Pending',
+  }
+}, {
+  timestamps: true,
 });
 
-module.exports = mongoose.model("Appointment", appointmentSchema);
+module.exports = Appointment;

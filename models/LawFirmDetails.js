@@ -1,33 +1,33 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 
-const Client = sequelize.define('Client', {
-  name: {
+const LawFirmDetails = sequelize.define('LawFirmDetails', {
+  lawFirmName: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  dateOfBirth: {
-    type: DataTypes.DATEONLY,
-    allowNull: false,
-  },
-  gender: {
+  operatingSince: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  email: {
+  yearsOfExperience: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  mobile: {
+  specialization: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  address: {
-    type: DataTypes.STRING,
+  contactInfo: {
+    type: DataTypes.JSONB,
     allowNull: false,
   },
-  profilePhoto: {
-    type: DataTypes.STRING,
+  professionalDetails: {
+    type: DataTypes.JSONB,
+    allowNull: false,
+  },
+  bankAccountDetails: {
+    type: DataTypes.JSONB,
   },
   createdBy: {
     type: DataTypes.INTEGER,
@@ -37,4 +37,4 @@ const Client = sequelize.define('Client', {
   timestamps: true,
 });
 
-module.exports = Client;
+module.exports = LawFirmDetails;

@@ -1,9 +1,12 @@
-//models/Settings.js
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/db');
 
-const SettingsSchema = new mongoose.Schema({
-    chatgptApiKey: { type: String, required: false },
-    updatedAt: { type: Date, default: Date.now },
+const Settings = sequelize.define('Settings', {
+  chatgptApiKey: {
+    type: DataTypes.STRING,
+  },
+}, {
+  timestamps: true,
 });
 
-module.exports = mongoose.model('Settings', SettingsSchema);
+module.exports = Settings;

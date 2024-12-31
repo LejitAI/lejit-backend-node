@@ -1,44 +1,42 @@
-// models/Case.js
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/db');
 
-const CaseSchema = new mongoose.Schema({
-    title: {
-        type: String,
-        required: true,
-    },
-    startingDate: {
-        type: Date,
-        required: true,
-    },
-    caseType: {
-        type: String,
-        required: true,
-    },
-    client: {
-        type: String,
-        required: true,
-    },
-    oppositeClient: {
-        type: String,
-    },
-    caseWitness: {
-        type: String,
-    },
-    caseDescription: {
-        type: String,
-    },
-    documents: [{
-        type: String,
-    }],
-    createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true,
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now,
-    },
+const Case = sequelize.define('Case', {
+  title: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  startingDate: {
+    type: DataTypes.DATEONLY,
+    allowNull: false,
+  },
+  caseType: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  client: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  oppositeClient: {
+    type: DataTypes.STRING,
+  },
+  caseWitness: {
+    type: DataTypes.STRING,
+  },
+  caseDescription: {
+    type: DataTypes.TEXT,
+  },
+  documents: {
+    type: DataTypes.ARRAY(DataTypes.STRING),
+    defaultValue: [],
+  },
+  createdBy: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  }
+}, {
+  timestamps: true,
 });
 
-module.exports = mongoose.model('Case', CaseSchema);
+module.exports = Case;
