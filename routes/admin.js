@@ -447,73 +447,63 @@ router.delete('/delete-client/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Book an appointment
-// Book an appointment
 router.post("/book-appointment", authenticateToken, async (req, res) => {
-  const { clientId, lawyerId, lawFirmId, appointmentDate, appointmentTime, caseNotes } = req.body;
+  const { 
+    clientId, 
+    appointmentDate, 
+    appointmentTime, 
+    gender, 
+    caseNotes 
+  } = req.body;
 
-  if (!clientId || !lawyerId || !lawFirmId || !appointmentDate || !appointmentTime) {
-    return res.status(400).json({ message: "Missing required fields." });
+  // Validate required fields
+  if (!clientId || !appointmentDate || !appointmentTime) {
+    return res.status(400).json({ message: "Missing required fields: clientId, appointmentDate, appointmentTime." });
   }
 
   try {
-    // Check if lawyer exists
-    const lawyer = await TeamMember.findById(lawyerId);
-    if (!lawyer) {
-      return res.status(404).json({ message: "Lawyer not found." });
-    }
-
-    // Check if client exists
+    // Validate the client exists
     const client = await Client.findById(clientId);
     if (!client) {
       return res.status(404).json({ message: "Client not found." });
     }
 
-    // Check for conflicting appointments
-    const conflictingAppointment = await Appointment.findOne({
+    // Fetch the logged-in user's lawyer ID and law firm ID dynamically
+    const lawyerId = req.user.id; // Assuming the logged-in user is the lawyer
+    const lawFirm = await User.findById(req.user.createdBy, '_id role');
+    if (!lawFirm || lawFirm.role !== "law_firm") {
+      return res.status(404).json({ message: "Law firm not found or invalid role." });
+    }
+
+    // Validate the appointment time slot
+    const existingAppointment = await Appointment.findOne({
       lawyerId,
       appointmentDate: new Date(appointmentDate),
       appointmentTime,
-      status: { $in: ["Pending", "Confirmed"] },
     });
 
-    if (conflictingAppointment) {
-      return res.status(400).json({ message: "Time slot is already booked." });
+    if (existingAppointment) {
+      return res.status(400).json({ message: "This time slot is already booked." });
     }
 
-    // Create and save appointment
+    // Create the new appointment
     const newAppointment = new Appointment({
       clientId,
       lawyerId,
-      lawFirmId,
+      lawFirmId: lawFirm._id,
       appointmentDate: new Date(appointmentDate),
       appointmentTime,
-      caseNotes,
+      caseNotes: caseNotes || null,
+      gender: gender || null, // Optional fields
     });
 
     await newAppointment.save();
-    res.status(201).json({ message: "Appointment booked successfully", appointment: newAppointment });
+    res.status(201).json({ message: "Appointment booked successfully.", appointment: newAppointment });
   } catch (error) {
     console.error("Error booking appointment:", error);
     res.status(500).json({ message: "Failed to book appointment. Please try again later." });
   }
 });
-
-// Get pending appointments for a lawyer
-router.get("/lawyer-appointments/:lawyerId", authenticateToken, async (req, res) => {
-  const { lawyerId } = req.params;
-
-  try {
-    const appointments = await Appointment.find({ lawyerId, status: "Pending" })
-      .populate("clientId", "name email")
-      .populate("lawFirmId", "law_firm_name");
-    res.status(200).json(appointments);
-  } catch (error) {
-    console.error("Error fetching appointments:", error);
-    res.status(500).json({ message: "Failed to fetch appointments." });
-  }
-});
-
 
 
 
