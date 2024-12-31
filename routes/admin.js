@@ -150,11 +150,12 @@ router.get('/get-team-members-by-law-firm/:lawFirmId', authenticateToken, async 
 
 //get all law firms
 // routes/admin.js
+// API to get all law firm details
 router.get('/get-all-law-firms', authenticateToken, async (req, res) => {
     try {
-        // Fetch all users with the 'law_firm' role
-        const lawFirms = await User.find({ role: 'law_firm' }, 'law_firm_name email validated');
-        
+        // Fetch all law firms from the ImageForm schema
+        const lawFirms = await ImageForm.find({}, 'lawFirmDetails professionalDetails bankAccountDetails createdAt createdBy');
+
         if (!lawFirms || lawFirms.length === 0) {
             return res.status(404).json({ message: 'No law firms found.' });
         }
@@ -165,6 +166,7 @@ router.get('/get-all-law-firms', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch law firms. Please try again later.' });
     }
 });
+
 
 // Get law firm details by ID
 router.get('/get-law-firm-details/:id', authenticateToken, async (req, res) => {
