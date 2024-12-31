@@ -135,12 +135,18 @@ router.get('/get-team-members-by-law-firm/:lawFirmId', authenticateToken, async 
 
     try {
         const teamMembers = await TeamMember.find({ createdBy: lawFirmId }).populate('createdBy', 'law_firm_name');
+
+        if (teamMembers.length === 0) {
+            return res.status(404).json({ message: 'No team members found for this law firm.' });
+        }
+
         res.status(200).json(teamMembers);
     } catch (error) {
-        console.error(error);
+        console.error('Error fetching team members:', error);
         res.status(500).json({ message: 'Failed to fetch team members. Please try again later.' });
     }
 });
+
 
 //get all law firms
 // routes/admin.js
