@@ -160,6 +160,25 @@ router.get('/get-all-law-firms', authenticateToken, async (req, res) => {
     }
 });
 
+// Get law firm details by ID
+router.get('/get-law-firm-details/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const lawFirmDetails = await ImageForm.findOne({ createdBy: id });
+
+        if (!lawFirmDetails) {
+            return res.status(404).json({ message: 'Law firm details not found.' });
+        }
+
+        res.status(200).json(lawFirmDetails);
+    } catch (error) {
+        console.error('Error fetching law firm details:', error);
+        res.status(500).json({ message: 'Failed to fetch law firm details. Please try again later.' });
+    }
+});
+
+
 
 // API to add a new case by an admin
 router.post('/add-case', authenticateToken, async (req, res) => {
