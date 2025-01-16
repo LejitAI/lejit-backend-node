@@ -57,6 +57,31 @@ router.post('/upload', authenticateToken, upload.single('document'), (req, res) 
     }
 });
 
+// Retrieve documents for a user
+router.get('/documents', authenticateToken, (req, res) => {
+    const userId = req.user.id; // Assuming the user ID is available in the authenticated request
+    const userDirectory = path.join('uploads', userId.toString());
+
+    try {
+        if (!fs.existsSync(userDirectory)) {
+            return res.status(404).json({ message: 'No documents found for this user.' });
+        }
+
+        const files = fs.readdirSync(userDirectory).map(file => ({
+            name: file,
+            path: path.join(userDirectory, file)
+        }));
+
+        res.status(200).json({
+            message: 'Documents retrieved successfully!',
+            documents: files
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error occurred while retrieving documents.' });
+    }
+});
+
 // Chat with ChatGPT (validated users only)
 router.post('/chat', authenticateToken, async (req, res) => {
     const { message } = req.body;
