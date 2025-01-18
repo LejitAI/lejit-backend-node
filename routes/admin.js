@@ -1,17 +1,19 @@
 // routes/admin.js
 const express = require('express');
 const Settings = require('../models/Settings');
-const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
 const router = express.Router();
 const User = require('../models/User');
+const { authenticateToken } = require('../middleware/auth');
 const TeamMember = require('../models/TeamMember');
 const bcrypt = require('bcryptjs');
 const Case = require('../models/Case'); // Import Case model
 const ImageForm = require('../models/LawFirm');
 const Client = require('../models/Client');
+const Appointment = require("../models/Appointment");
+
 
 // Add or update ChatGPT API key
-router.post('/set-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req, res) => {
+router.post('/set-chatgpt-api-key', authenticateToken, async (req, res) => {
     const { chatgptApiKey } = req.body;
 
     if (!chatgptApiKey) {
@@ -37,7 +39,7 @@ router.post('/set-chatgpt-api-key', authenticateToken, authorizeAdmin, async (re
     }
 });
 
-router.get('/get-users', authenticateToken, authorizeAdmin, async (req, res) => {
+router.get('/get-users', authenticateToken, async (req, res) => {
     try {
         const users = await User.find({}, 'username _id validated'); // Only select the fields we need
         res.status(200).json(users);
@@ -49,7 +51,7 @@ router.get('/get-users', authenticateToken, authorizeAdmin, async (req, res) => 
 
 
 // Get the ChatGPT API key (admin only)
-router.get('/get-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req, res) => {
+router.get('/get-chatgpt-api-key', authenticateToken, async (req, res) => {
     try {
         const settings = await Settings.findOne();
         if (!settings || !settings.chatgptApiKey) {
@@ -64,7 +66,7 @@ router.get('/get-chatgpt-api-key', authenticateToken, authorizeAdmin, async (req
 
 
 // API to add a new team member by an admin
-router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, res) => {
+router.post('/add-team-member', authenticateToken, async (req, res) => {
     const {
         personalDetails,
         professionalDetails,
@@ -96,14 +98,18 @@ router.post('/add-team-member', authenticateToken, authorizeAdmin, async (req, r
 });
 
 // API to delete a team member
-router.delete('/delete-team-member/:id', authenticateToken, authorizeAdmin, async (req, res) => {
+router.delete('/delete-team-member/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     try {
-        const deletedMember = await TeamMember.findByIdAndDelete(id);
+        // Find and delete the team member created by the logged-in user
+        const deletedMember = await TeamMember.findOneAndDelete({
+            _id: id,
+            createdBy: req.user.id
+        });
 
         if (!deletedMember) {
-            return res.status(404).json({ message: 'Team member not found.' });
+            return res.status(404).json({ message: 'Team member not found or access denied.' });
         }
 
         res.status(200).json({ message: 'Team member deleted successfully.' });
@@ -112,6 +118,96 @@ router.delete('/delete-team-member/:id', authenticateToken, authorizeAdmin, asyn
         res.status(500).json({ message: 'Failed to delete team member. Please try again later.' });
     }
 });
+
+// API to get team member details by ID
+router.get('/get-team-member-details/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Find the team member by ID
+        const teamMember = await TeamMember.findById(id).select('-password');
+
+        if (!teamMember) {
+            return res.status(404).json({ message: 'Team member not found.' });
+        }
+
+        res.status(200).json(teamMember);
+    } catch (error) {
+        console.error('Error fetching team member details:', error);
+        res.status(500).json({ message: 'Failed to fetch team member details. Please try again later.' });
+    }
+});
+
+
+// routes/admin.js
+router.get('/get-law-firms', authenticateToken, async (req, res) => {
+    try {
+        const lawFirms = await User.find({ role: 'law_firm' }, 'law_firm_name _id');
+        res.status(200).json(lawFirms);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to fetch law firms. Please try again later.' });
+    }
+});
+
+
+// API to fetch team members by law firm ID
+router.get('/get-team-members-by-law-firm/:lawFirmId', authenticateToken, async (req, res) => {
+    const { lawFirmId } = req.params;
+
+    try {
+        const teamMembers = await TeamMember.find({ createdBy: lawFirmId }).populate('createdBy', 'law_firm_name');
+
+        if (teamMembers.length === 0) {
+            return res.status(404).json({ message: 'No team members found for this law firm.' });
+        }
+
+        res.status(200).json(teamMembers);
+    } catch (error) {
+        console.error('Error fetching team members:', error);
+        res.status(500).json({ message: 'Failed to fetch team members. Please try again later.' });
+    }
+});
+
+
+//get all law firms
+// routes/admin.js
+// API to get all law firm details
+router.get('/get-all-law-firms', authenticateToken, async (req, res) => {
+    try {
+        // Fetch all law firms from the ImageForm schema
+        const lawFirms = await ImageForm.find({}, 'lawFirmDetails professionalDetails bankAccountDetails createdAt createdBy');
+
+        if (!lawFirms || lawFirms.length === 0) {
+            return res.status(404).json({ message: 'No law firms found.' });
+        }
+
+        res.status(200).json(lawFirms);
+    } catch (error) {
+        console.error('Error fetching law firms:', error);
+        res.status(500).json({ message: 'Failed to fetch law firms. Please try again later.' });
+    }
+});
+
+
+// Get law firm details by ID
+router.get('/get-law-firm-details/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const lawFirmDetails = await ImageForm.findOne({ createdBy: id });
+
+        if (!lawFirmDetails) {
+            return res.status(404).json({ message: 'Law firm details not found.' });
+        }
+
+        res.status(200).json(lawFirmDetails);
+    } catch (error) {
+        console.error('Error fetching law firm details:', error);
+        res.status(500).json({ message: 'Failed to fetch law firm details. Please try again later.' });
+    }
+});
+
 
 
 // routes/admin.js
@@ -140,7 +236,7 @@ router.get('/get-team-members-by-law-firm/:lawFirmId', authenticateToken, async 
 
 
 // API to add a new case by an admin
-router.post('/add-case', async (req, res) => {
+router.post('/add-case', authenticateToken, async (req, res) => {
     const {
         title,
         startingDate,
@@ -167,7 +263,7 @@ router.post('/add-case', async (req, res) => {
             caseWitness,
             caseDescription,
             documents,
-            //createdBy: req.user.id,
+            createdBy: req.user.id, // Associate the logged-in user
         });
 
         await newCase.save();
@@ -179,14 +275,18 @@ router.post('/add-case', async (req, res) => {
 });
 
 // API to delete a case
-router.delete('/delete-case/:id', async (req, res) => {
+router.delete('/delete-case/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     try {
-        const deletedCase = await Case.findByIdAndDelete(id);
+        // Find and delete the case created by the logged-in user
+        const deletedCase = await Case.findOneAndDelete({
+            _id: id,
+            createdBy: req.user.id // Ensure the case belongs to the logged-in user
+        });
 
         if (!deletedCase) {
-            return res.status(404).json({ message: 'Case not found.' });
+            return res.status(404).json({ message: 'Case not found or access denied.' });
         }
 
         res.status(200).json({ message: 'Case deleted successfully.' });
@@ -198,10 +298,12 @@ router.delete('/delete-case/:id', async (req, res) => {
 
 
 
+
 // API to get all team members
-router.get('/get-team-members', authenticateToken, authorizeAdmin, async (req, res) => {
+router.get('/get-team-members', authenticateToken, async (req, res) => {
     try {
-        const teamMembers = await TeamMember.find({}, '-password'); // Exclude password field for security
+        // Fetch team members created by the logged-in user
+        const teamMembers = await TeamMember.find({ createdBy: req.user.id }, '-password').sort({ createdAt: -1 });
         res.status(200).json(teamMembers);
     } catch (error) {
         console.error(error);
@@ -210,8 +312,9 @@ router.get('/get-team-members', authenticateToken, authorizeAdmin, async (req, r
 });
 
 
+
 // Add a new law firm details (including personal, professional, and bank details)
-router.post('/add-law-firm-details', authenticateToken, authorizeAdmin, async (req, res) => {
+router.post('/add-law-firm-details', authenticateToken, async (req, res) => {
     const {
         lawFirmDetails,
         professionalDetails,
@@ -280,10 +383,10 @@ router.put('/update-law-firm-details', authenticateToken, async (req, res) => {
 
 
 // API to get all case details
-router.get('/get-cases', async (req, res) => {
+router.get('/get-cases', authenticateToken, async (req, res) => {
     try {
-        // Retrieve all cases from the database
-        const cases = await Case.find({});
+        // Retrieve cases created by the logged-in user
+        const cases = await Case.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
         res.status(200).json(cases);
     } catch (error) {
         console.error(error);
@@ -292,8 +395,9 @@ router.get('/get-cases', async (req, res) => {
 });
 
 
+
 // API to add client details
-router.post('/add-client', async (req, res) => {
+router.post('/add-client', authenticateToken, async (req, res) => {
     const {
         name,
         dateOfBirth,
@@ -318,7 +422,7 @@ router.post('/add-client', async (req, res) => {
             mobile,
             address,
             profilePhoto,
-            createdBy: req.user.id,
+            createdBy: req.user.id, // Associate the logged-in user
         });
 
         await newClient.save();
@@ -331,19 +435,99 @@ router.post('/add-client', async (req, res) => {
 
 
 // API to get client details
-router.get('/get-client', async (req, res) => {
+router.get('/get-client', authenticateToken, async (req, res) => {
     try {
-        const client = await Client.find({}); // Get client details added by the logged-in admin
+        // Retrieve clients created by the logged-in user
+        const clients = await Client.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
         
-        if (!client) {
-            return res.status(404).json({ message: 'Client details not found' });
+        if (!clients || clients.length === 0) {
+            return res.status(200).json([]); // Return an empty array if no clients are found
         }
 
-        res.status(200).json(client);
+        res.status(200).json(clients);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to retrieve client details. Please try again later.' });
     }
+});
+
+router.delete('/delete-client/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Find and delete the client created by the logged-in user
+        const deletedClient = await Client.findOneAndDelete({
+            _id: id,
+            createdBy: req.user.id, // Ensure the client belongs to the logged-in user
+        });
+
+        if (!deletedClient) {
+            return res.status(404).json({ message: 'Client not found or access denied.' });
+        }
+
+        res.status(200).json({ message: 'Client deleted successfully.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to delete client. Please try again later.' });
+    }
+});
+
+router.post("/book-appointment", authenticateToken, async (req, res) => {
+  const { 
+    clientId, 
+    appointmentDate, 
+    appointmentTime, 
+    gender, 
+    caseNotes 
+  } = req.body;
+
+  // Validate required fields
+  if (!clientId || !appointmentDate || !appointmentTime) {
+    return res.status(400).json({ message: "Missing required fields: clientId, appointmentDate, appointmentTime." });
+  }
+
+  try {
+    // Validate the client exists
+    const client = await Client.findById(clientId);
+    if (!client) {
+      return res.status(404).json({ message: "Client not found." });
+    }
+
+    // Fetch the logged-in user's lawyer ID and law firm ID dynamically
+    const lawyerId = req.user.id; // Assuming the logged-in user is the lawyer
+    const lawFirm = await User.findById(req.user.createdBy, '_id role');
+    if (!lawFirm || lawFirm.role !== "law_firm") {
+      return res.status(404).json({ message: "Law firm not found or invalid role." });
+    }
+
+    // Validate the appointment time slot
+    const existingAppointment = await Appointment.findOne({
+      lawyerId,
+      appointmentDate: new Date(appointmentDate),
+      appointmentTime,
+    });
+
+    if (existingAppointment) {
+      return res.status(400).json({ message: "This time slot is already booked." });
+    }
+
+    // Create the new appointment
+    const newAppointment = new Appointment({
+      clientId,
+      lawyerId,
+      lawFirmId: lawFirm._id,
+      appointmentDate: new Date(appointmentDate),
+      appointmentTime,
+      caseNotes: caseNotes || null,
+      gender: gender || null, // Optional fields
+    });
+
+    await newAppointment.save();
+    res.status(201).json({ message: "Appointment booked successfully.", appointment: newAppointment });
+  } catch (error) {
+    console.error("Error booking appointment:", error);
+    res.status(500).json({ message: "Failed to book appointment. Please try again later." });
+  }
 });
 
 
