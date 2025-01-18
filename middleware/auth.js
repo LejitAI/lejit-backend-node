@@ -13,7 +13,9 @@ const authenticateToken = async (req, res, next) => {
         const user = await User.findById(decoded.id);
 
         if (!user) return res.status(404).json({ message: 'User not found' });
-        if (!user.validated) return res.status(403).json({ message: 'User is not validated by admin' });
+        
+        // Comment out the validation check below
+        // if (!user.validated) return res.status(403).json({ message: 'User is not validated by admin' });
 
         req.user = user;
         next();
