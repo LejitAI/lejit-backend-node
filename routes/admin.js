@@ -210,6 +210,31 @@ router.get('/get-law-firm-details/:id', authenticateToken, async (req, res) => {
 
 
 
+// routes/admin.js
+router.get('/get-law-firms', authenticateToken, async (req, res) => {
+    try {
+        const lawFirms = await User.find({ role: 'law_firm' }, 'law_firm _id'); // Fetch law firm names and IDs
+        res.status(200).json(lawFirms);
+    } catch (error) {
+        console.error('Error fetching law firms:', error);
+        res.status(500).json({ message: 'Failed to fetch law firms. Please try again later.' });
+    }
+});
+
+// API to fetch team members by law firm ID
+router.get('/get-team-members-by-law-firm/:lawFirmId', authenticateToken, async (req, res) => {
+    const { lawFirmId } = req.params;
+    try {
+        const teamMembers = await TeamMember.find({ createdBy: lawFirmId }, '-password').sort({ createdAt: -1 });
+        res.status(200).json(teamMembers);
+    } catch (error) {
+        console.error('Error fetching team members:', error);
+        res.status(500).json({ message: 'Failed to fetch team members. Please try again later.' });
+    }
+});
+
+
+
 // API to add a new case by an admin
 router.post('/add-case', authenticateToken, async (req, res) => {
     const {
