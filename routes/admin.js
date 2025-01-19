@@ -535,13 +535,12 @@ router.post("/book-appointment", authenticateToken, async (req, res) => {
 
 
 // API to add a new hearing
+// API to add a new hearing
 router.post('/add-hearing', authenticateToken, async (req, res) => {
     const {
         caseId,
         date,
         time,
-        client,
-        caseType,
         location,
         judge,
         courtRoom,
@@ -550,6 +549,9 @@ router.post('/add-hearing', authenticateToken, async (req, res) => {
         documents
     } = req.body;
 
+    if (!caseId || !date || !time || !location) {
+        return res.status(400).json({ message: 'Please fill in all required fields.' });
+    }
 
     try {
         // Verify if the case exists
@@ -562,16 +564,14 @@ router.post('/add-hearing', authenticateToken, async (req, res) => {
             caseId,
             date,
             time,
-            client,
-            caseType,
             location,
-            notes,
             judge,
             courtRoom,
             opposingParty,
             witnesses,
             documents,
-            createdBy: req.user.id
+            createdBy: req.user.id,
+            caseType: existingCase.caseType // Get caseType from the existing case
         });
 
         await newHearing.save();
@@ -581,7 +581,6 @@ router.post('/add-hearing', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Failed to schedule hearing.' });
     }
 });
-
 // API to get all hearings
 router.get('/get-hearings', authenticateToken, async (req, res) => {
     try {
