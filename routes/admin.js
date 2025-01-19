@@ -550,7 +550,7 @@ router.post('/add-hearing', authenticateToken, async (req, res) => {
         documents
     } = req.body;
 
-    if (!caseId || !date || !time || !caseType || !location) {
+    if (!caseId) {
         return res.status(400).json({ message: 'Please fill in all required fields.' });
     }
 
