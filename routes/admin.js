@@ -531,5 +531,53 @@ router.post("/book-appointment", authenticateToken, async (req, res) => {
 });
 
 
+// API to add a new hearing
+router.post('/add-hearing', authenticateToken, async (req, res) => {
+    const {
+        date,
+        time,
+        client,
+        caseType,
+        location,
+        notes
+    } = req.body;
+
+    if (!date || !client || !caseType) {
+        return res.status(400).json({ message: 'Please fill in all required fields.' });
+    }
+
+    try {
+        const newHearing = new Hearing({
+            date,
+            time,
+            client,
+            caseType,
+            location,
+            notes,
+            createdBy: req.user.id
+        });
+
+        await newHearing.save();
+        res.status(201).json({ message: 'Hearing scheduled successfully', hearing: newHearing });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to schedule hearing.' });
+    }
+});
+
+// API to get all hearings
+router.get('/get-hearings', authenticateToken, async (req, res) => {
+    try {
+        const hearings = await Hearing.find({ createdBy: req.user.id })
+            .sort({ date: 1 })
+            .populate('client', 'name image caseType');
+        
+        res.status(200).json(hearings);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve hearings.' });
+    }
+});
+
 
 module.exports = router;
