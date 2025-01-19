@@ -534,7 +534,33 @@ router.post("/book-appointment", authenticateToken, async (req, res) => {
 
 
 
-// API to add a new hearing
+// API to get all hearings
+router.get('/get-hearings', authenticateToken, async (req, res) => {
+    try {
+        const hearings = await Hearing.find({ createdBy: req.user.id })
+            .sort({ date: 1, time: 1 })
+            .populate('client', 'name')
+            .populate('caseId', 'title caseType')
+            .lean(); // Use lean for better performance
+        
+        // Calculate and include `endTime` in response
+        const hearingsWithEndTime = hearings.map(hearing => {
+            const [hours, minutes] = hearing.time.split(':').map(Number);
+            const endDate = new Date(hearing.date);
+            endDate.setHours(hours, minutes + (hearing.duration || 60));
+            return {
+                ...hearing,
+                endTime: endDate.toISOString(),
+            };
+        });
+
+        res.status(200).json(hearingsWithEndTime);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve hearings.' });
+    }
+});
+
 // API to add a new hearing
 router.post('/add-hearing', authenticateToken, async (req, res) => {
     const {
@@ -549,13 +575,32 @@ router.post('/add-hearing', authenticateToken, async (req, res) => {
         documents
     } = req.body;
 
-    
+    if (!caseId || !date || !time || !location) {
+        return res.status(400).json({ message: 'Missing required fields.' });
+    }
 
     try {
-        // Verify if the case exists
+        // Verify case existence
         const existingCase = await Case.findById(caseId);
         if (!existingCase) {
             return res.status(404).json({ message: 'Case not found.' });
+        }
+
+        // Validate time conflict
+        const startTime = new Date(`${date}T${time}`);
+        const endTime = new Date(startTime.getTime() + (60 * 60 * 1000)); // Default 1-hour duration
+
+        const conflict = await Hearing.findOne({
+            caseId,
+            date,
+            $or: [
+                { time: { $gte: time, $lt: endTime.toISOString().split('T')[1] } },
+                { endTime: { $gte: time, $lt: endTime.toISOString().split('T')[1] } }
+            ]
+        });
+
+        if (conflict) {
+            return res.status(400).json({ message: 'Hearing time conflicts with an existing schedule.' });
         }
 
         const newHearing = new Hearing({
@@ -569,7 +614,7 @@ router.post('/add-hearing', authenticateToken, async (req, res) => {
             witnesses,
             documents,
             createdBy: req.user.id,
-            caseType: existingCase.caseType // Get caseType from the existing case
+            caseType: existingCase.caseType
         });
 
         await newHearing.save();
@@ -577,20 +622,6 @@ router.post('/add-hearing', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to schedule hearing.' });
-    }
-});
-// API to get all hearings
-router.get('/get-hearings', authenticateToken, async (req, res) => {
-    try {
-        const hearings = await Hearing.find({ createdBy: req.user.id })
-            .sort({ date: 1, time: 1 })
-            .populate('client', 'name')
-            .populate('caseId', 'title caseType');
-        
-        res.status(200).json(hearings);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve hearings.' });
     }
 });
 
