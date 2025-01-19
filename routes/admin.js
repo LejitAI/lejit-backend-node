@@ -10,6 +10,7 @@ const Case = require('../models/Case'); // Import Case model
 const ImageForm = require('../models/LawFirm');
 const Client = require('../models/Client');
 const Appointment = require("../models/Appointment");
+const Hearing = require('../models/Hearing');
 
 
 // Add or update ChatGPT API key
@@ -531,29 +532,49 @@ router.post("/book-appointment", authenticateToken, async (req, res) => {
 });
 
 
+
+
 // API to add a new hearing
 router.post('/add-hearing', authenticateToken, async (req, res) => {
     const {
+        caseId,
         date,
         time,
         client,
         caseType,
         location,
-        notes
+        notes,
+        judge,
+        courtRoom,
+        opposingParty,
+        witnesses,
+        documents
     } = req.body;
 
-    if (!date || !client || !caseType) {
+    if (!caseId || !date || !time || !client || !caseType || !location) {
         return res.status(400).json({ message: 'Please fill in all required fields.' });
     }
 
     try {
+        // Verify if the case exists
+        const existingCase = await Case.findById(caseId);
+        if (!existingCase) {
+            return res.status(404).json({ message: 'Case not found.' });
+        }
+
         const newHearing = new Hearing({
+            caseId,
             date,
             time,
             client,
             caseType,
             location,
             notes,
+            judge,
+            courtRoom,
+            opposingParty,
+            witnesses,
+            documents,
             createdBy: req.user.id
         });
 
@@ -569,8 +590,9 @@ router.post('/add-hearing', authenticateToken, async (req, res) => {
 router.get('/get-hearings', authenticateToken, async (req, res) => {
     try {
         const hearings = await Hearing.find({ createdBy: req.user.id })
-            .sort({ date: 1 })
-            .populate('client', 'name image caseType');
+            .sort({ date: 1, time: 1 })
+            .populate('client', 'name')
+            .populate('caseId', 'title caseType');
         
         res.status(200).json(hearings);
     } catch (error) {
@@ -578,6 +600,86 @@ router.get('/get-hearings', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Failed to retrieve hearings.' });
     }
 });
+
+// API to get hearing details by ID
+router.get('/get-hearing/:id', authenticateToken, async (req, res) => {
+    try {
+        const hearing = await Hearing.findOne({ 
+            _id: req.params.id,
+            createdBy: req.user.id 
+        })
+        .populate('client', 'name')
+        .populate('caseId', 'title caseType');
+
+        if (!hearing) {
+            return res.status(404).json({ message: 'Hearing not found.' });
+        }
+
+        res.status(200).json(hearing);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve hearing details.' });
+    }
+});
+
+// API to update hearing details
+router.put('/update-hearing/:id', authenticateToken, async (req, res) => {
+    try {
+        const updatedHearing = await Hearing.findOneAndUpdate(
+            { _id: req.params.id, createdBy: req.user.id },
+            { 
+                $set: {
+                    ...req.body,
+                    updatedAt: new Date()
+                }
+            },
+            { new: true }
+        );
+
+        if (!updatedHearing) {
+            return res.status(404).json({ message: 'Hearing not found.' });
+        }
+
+        res.status(200).json({ message: 'Hearing updated successfully', hearing: updatedHearing });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to update hearing.' });
+    }
+});
+
+// API to delete hearing
+router.delete('/delete-hearing/:id', authenticateToken, async (req, res) => {
+    try {
+        const deletedHearing = await Hearing.findOneAndDelete({
+            _id: req.params.id,
+            createdBy: req.user.id
+        });
+
+        if (!deletedHearing) {
+            return res.status(404).json({ message: 'Hearing not found.' });
+        }
+
+        res.status(200).json({ message: 'Hearing deleted successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to delete hearing.' });
+    }
+});
+
+// API to get upcoming hearings
+router.get('/get-upcoming-hearings', authenticateToken, async (req, res) => {
+    try {
+        const upcomingHearings = await Hearing.findUpcoming(req.user.id)
+            .populate('client', 'name')
+            .populate('caseId', 'title caseType');
+        
+        res.status(200).json(upcomingHearings);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve upcoming hearings.' });
+    }
+});
+
 
 
 module.exports = router;
