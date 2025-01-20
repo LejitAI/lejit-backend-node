@@ -533,6 +533,62 @@ router.post("/book-appointment", authenticateToken, async (req, res) => {
 
 
 
+// Get all appointments for the law firm
+router.get('/appointments', authenticateToken, async (req, res) => {
+  try {
+    const appointments = await Appointment.find({ lawFirmId: req.user.id })
+      .populate('clientId', 'name')
+      .populate('caseId', 'caseType description')
+      .sort({ appointmentDate: -1 });
+
+    const formattedAppointments = appointments.map(apt => ({
+      id: apt._id,
+      title: "Appointment Request",
+      date: new Date(apt.appointmentDate).toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'long',
+        hour: 'numeric',
+        minute: 'numeric',
+      }),
+      status: apt.status, // 'pending', 'accepted', 'rejected'
+      client: {
+        name: apt.clientId.name,
+        caseType: apt.caseId?.caseType || 'New Consultation',
+        description: apt.caseId?.description || apt.caseNotes || 'New client consultation request',
+      }
+    }));
+
+    res.status(200).json(formattedAppointments);
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    res.status(500).json({ message: 'Failed to fetch appointments' });
+  }
+});
+
+// Update appointment status
+router.patch('/appointments/:id/status', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // 'accepted' or 'rejected'
+
+    const appointment = await Appointment.findOneAndUpdate(
+      { _id: id, lawFirmId: req.user.id },
+      { status },
+      { new: true }
+    );
+
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+
+    res.status(200).json({ message: `Appointment ${status} successfully` });
+  } catch (error) {
+    console.error('Error updating appointment:', error);
+    res.status(500).json({ message: 'Failed to update appointment' });
+  }
+});
+
+
 
 // API to get all hearings
 router.get('/get-hearings', authenticateToken, async (req, res) => {
