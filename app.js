@@ -7,6 +7,8 @@ const adminRoutes = require('./routes/admin');
 const chatRoutes = require('./routes/chat');
 const ttsRoute = require('./routes/tts');
 const speechToTextRoute = require('./routes/speech-to-text');
+const hearingScheduleRoutes = require('./routes/hearingSchedule');
+
 
 const cors=require("cors");
 const corsOptions ={
@@ -39,6 +41,8 @@ app.use('/api/speech-to-text', speechToTextRoute);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/hearing-schedule', hearingScheduleRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
