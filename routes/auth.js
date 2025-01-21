@@ -216,4 +216,15 @@ router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req
     }
 });
 
+// Add this new route to your existing auth.js
+router.post('/signout', authenticateToken, async (req, res) => {
+    try {
+        // You could implement a token blacklist here if needed
+        res.status(200).json({ message: 'Signed out successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to sign out' });
+    }
+});
+
 module.exports = router;
