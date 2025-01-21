@@ -646,8 +646,6 @@ router.post('/', async (req, res) => {
     }
 });
 
-module.exports = router;
-});
 
 // API to get hearing details by ID
 router.get('/get-hearing/:id', authenticateToken, async (req, res) => {
