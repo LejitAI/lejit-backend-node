@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const HearingScheduleSchema = new mongoose.Schema({
+const HearingSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -29,4 +29,4 @@ const HearingScheduleSchema = new mongoose.Schema({
     },
 });
 
-module.exports = mongoose.model('HearingSchedule', HearingScheduleSchema);
+module.exports = mongoose.model('Hearing', HearingSchema);
