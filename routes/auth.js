@@ -102,7 +102,7 @@ router.post('/register', async (req, res) => {
         );
 
         res.status(201).json({ 
-            message: ${role} registered successfully,
+            message: `${role} registered successfully`,
             token,
             user: {
                 id: newUser._id,
@@ -216,7 +216,7 @@ router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req
         // Update validation status
         user.validated = true;
         await user.save();
-        res.json({ message: ${user.role} validated successfully });
+        res.json({ message: `${user.role} validated successfully` });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to validate user. Please try again later.' });
