@@ -37,4 +37,21 @@ router.post('/', async (req, res) => {
     }
 });
 
+router.get('/:userId', async (req, res) => {
+    const { userId } = req.params;
+
+    try {
+        const hearingSchedules = await HearingSchedule.find({ userId }).select('caseName date time');
+        if (!hearingSchedules.length) {
+            return res.status(404).json({ message: 'No hearing schedules found' });
+        }
+
+        res.status(200).json(hearingSchedules);
+    } catch (error) {
+        console.error('Error fetching hearing schedules:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
 module.exports = router;
