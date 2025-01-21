@@ -474,7 +474,6 @@ router.delete('/delete-client/:id', authenticateToken, async (req, res) => {
 });
 
 
-
 router.post('/book-appointment', authenticateToken, async (req, res) => {
     const { clientId, lawyerId, lawFirmId, appointmentDate, appointmentTime, gender, caseNotes } = req.body;
 
@@ -497,9 +496,9 @@ router.post('/book-appointment', authenticateToken, async (req, res) => {
         }
 
         // Validate the law firm exists
-        const lawFirm = await User.findById(lawFirmId);
-        if (!lawFirm || lawFirm.role !== "law_firm") {
-            return res.status(404).json({ message: "Law firm not found or invalid role." });
+        const lawFirm = await ImageForm.findById(lawFirmId);
+        if (!lawFirm) {
+            return res.status(404).json({ message: "Law firm not found." });
         }
 
         // Validate the appointment time slot
@@ -532,7 +531,6 @@ router.post('/book-appointment', authenticateToken, async (req, res) => {
     }
 });
 
-module.exports = router;
 
 
 // Get all appointments for the law firm
