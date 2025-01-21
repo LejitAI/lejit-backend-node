@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const TeamMember = require('../models/TeamMember');
+const ImageForm = require('../models/LawFirm'); // Import LawFirm model
 const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
 const router = express.Router();
 
@@ -48,8 +49,57 @@ router.post('/register', async (req, res) => {
 
         await newUser.save();
 
-        // If it's a law firm user, create a team member entry
+        // If it's a law firm user, create a law firm entry and a team member entry
         if (role === 'law_firm') {
+            // Create Law Firm entry
+            const newLawFirm = new ImageForm({
+                lawFirmDetails: {
+                    lawFirmName: law_firm_name,
+                    operatingSince: new Date().getFullYear().toString(),
+                    yearsOfExperience: '0',
+                    specialization: '',
+                    contactInfo: {
+                        email: email,
+                        mobile: '',
+                        address: {
+                            line1: '',
+                            line2: '',
+                            city: '',
+                            state: '',
+                            postalCode: '',
+                        },
+                    },
+                },
+                professionalDetails: {
+                    lawyerType: 'Law Firm',
+                    caseDetails: {
+                        caseSolvedCount: 0,
+                        caseBasedBillRate: '',
+                        timeBasedBillRate: '',
+                        previousCases: [],
+                    },
+                },
+                bankAccountDetails: {
+                    paymentMethod: 'Card',
+                    cardDetails: {
+                        cardNumber: '',
+                        expirationDate: '',
+                        cvv: '',
+                        saveCard: false,
+                    },
+                    bankDetails: {
+                        accountNumber: '',
+                        bankName: '',
+                        ifscCode: '',
+                    },
+                    upiId: '',
+                },
+                createdBy: newUser._id, // Associate the law firm with the registered user
+            });
+
+            await newLawFirm.save();
+
+            // Create a team member entry for the law firm owner
             const teamMember = new TeamMember({
                 personalDetails: {
                     name: username,
@@ -64,7 +114,7 @@ router.post('/register', async (req, res) => {
                         state: '',
                         country: '',
                         postalCode: '',
-                    }
+                    },
                 },
                 professionalDetails: {
                     lawyerType: 'Owner',
@@ -89,7 +139,7 @@ router.post('/register', async (req, res) => {
                     upiId: '',
                 },
                 password: password,
-                createdBy: newUser._id
+                createdBy: newUser._id,
             });
 
             await teamMember.save();
@@ -101,7 +151,7 @@ router.post('/register', async (req, res) => {
             process.env.JWT_SECRET
         );
 
-        res.status(201).json({ 
+        res.status(201).json({
             message: `${role} registered successfully`,
             token,
             user: {
@@ -109,8 +159,8 @@ router.post('/register', async (req, res) => {
                 username: newUser.username,
                 email: newUser.email,
                 role: newUser.role,
-                law_firm_name: newUser.law_firm_name
-            }
+                law_firm_name: newUser.law_firm_name,
+            },
         });
     } catch (error) {
         console.error(error);
@@ -144,16 +194,15 @@ router.post('/login', async (req, res) => {
             { id: user._id, role: user.role },
             process.env.JWT_SECRET
         );
-        
+
         // Get team member details if it's a law firm
         let teamMemberDetails = null;
         if (user.role === 'law_firm') {
-            teamMemberDetails = await TeamMember.findOne({ 'personalDetails.email': email })
-                .select('-password');
+            teamMemberDetails = await TeamMember.findOne({ 'personalDetails.email': email }).select('-password');
         }
 
-        res.json({ 
-            token, 
+        res.json({
+            token,
             role: user.role,
             user: {
                 id: user._id,
@@ -161,8 +210,8 @@ router.post('/login', async (req, res) => {
                 email: user.email,
                 role: user.role,
                 law_firm_name: user.law_firm_name,
-                teamMemberDetails: teamMemberDetails
-            }
+                teamMemberDetails: teamMemberDetails,
+            },
         });
     } catch (error) {
         console.error(error);
@@ -182,8 +231,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         // Fetch additional details for law firms
         let teamMemberDetails = null;
         if (user.role === 'law_firm') {
-            teamMemberDetails = await TeamMember.findOne({ createdBy: user._id })
-                .select('-password');
+            teamMemberDetails = await TeamMember.findOne({ createdBy: user._id }).select('-password');
         }
 
         // Return user profile
@@ -200,37 +248,6 @@ router.get('/profile', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error fetching profile:', error);
         res.status(500).json({ message: 'Failed to fetch user profile' });
-    }
-});
-
-
-// (Optional) Admin validates the user (if needed in the future)
-router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req, res) => {
-    try {
-        // Find user by ID
-        const user = await User.findById(req.params.id);
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Update validation status
-        user.validated = true;
-        await user.save();
-        res.json({ message: `${user.role} validated successfully` });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to validate user. Please try again later.' });
-    }
-});
-
-// Add this new route to your existing auth.js
-router.post('/signout', authenticateToken, async (req, res) => {
-    try {
-        // You could implement a token blacklist here if needed
-        res.status(200).json({ message: 'Signed out successfully' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to sign out' });
     }
 });
 
