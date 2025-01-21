@@ -607,67 +607,46 @@ router.get('/get-hearings', authenticateToken, async (req, res) => {
 });
 
 // API to add a new hearing
-router.post('/add-hearing', authenticateToken, async (req, res) => {
-    const {
-        caseId,
-        date,
-        time,
-        location,
-        judge,
-        courtRoom,
-        opposingParty,
-        witnesses,
-        documents
-    } = req.body;
+const express = require('express');
+const router = express.Router();
+const HearingSchedule = require('../models/HearingSchedule');
+const Case = require('../models/Case');
+const User = require('../models/User');
 
-    if (!caseId || !date || !time || !location) {
-        return res.status(400).json({ message: 'Missing required fields.' });
-    }
+// POST /api/hearing-schedule
+router.post('/', async (req, res) => {
+    const { userId, caseId, caseName, date, time } = req.body;
 
     try {
-        // Verify case existence
-        const existingCase = await Case.findById(caseId);
-        if (!existingCase) {
-            return res.status(404).json({ message: 'Case not found.' });
+        // Validate user and case existence
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
         }
 
-        // Validate time conflict
-        const startTime = new Date(`${date}T${time}`);
-        const endTime = new Date(startTime.getTime() + (60 * 60 * 1000)); // Default 1-hour duration
-
-        const conflict = await Hearing.findOne({
-            caseId,
-            date,
-            $or: [
-                { time: { $gte: time, $lt: endTime.toISOString().split('T')[1] } },
-                { endTime: { $gte: time, $lt: endTime.toISOString().split('T')[1] } }
-            ]
-        });
-
-        if (conflict) {
-            return res.status(400).json({ message: 'Hearing time conflicts with an existing schedule.' });
+        const caseItem = await Case.findById(caseId);
+        if (!caseItem) {
+            return res.status(404).json({ message: 'Case not found' });
         }
 
-        const newHearing = new Hearing({
+        // Create new hearing schedule
+        const newHearingSchedule = new HearingSchedule({
+            userId,
             caseId,
+            caseName,
             date,
             time,
-            location,
-            judge,
-            courtRoom,
-            opposingParty,
-            witnesses,
-            documents,
-            createdBy: req.user.id,
-            caseType: existingCase.caseType
         });
 
-        await newHearing.save();
-        res.status(201).json({ message: 'Hearing scheduled successfully', hearing: newHearing });
+        await newHearingSchedule.save();
+        res.status(201).json({ message: 'Hearing schedule created successfully', hearingSchedule: newHearingSchedule });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to schedule hearing.' });
+        console.error('Error creating hearing schedule:', error);
+        res.status(500).json({ message: 'Server error' });
     }
+});
+
+module.exports = router;
 });
 
 // API to get hearing details by ID
