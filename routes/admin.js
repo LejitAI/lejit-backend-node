@@ -473,62 +473,62 @@ router.delete('/delete-client/:id', authenticateToken, async (req, res) => {
     }
 });
 
-router.post("/book-appointment", authenticateToken, async (req, res) => {
-  const { 
-    clientId, 
-    appointmentDate, 
-    appointmentTime, 
-    gender, 
-    caseNotes 
-  } = req.body;
 
-  // Validate required fields
-  if (!clientId || !appointmentDate || !appointmentTime) {
-    return res.status(400).json({ message: "Missing required fields: clientId, appointmentDate, appointmentTime." });
-  }
+router.post('/book-appointment', authenticateToken, async (req, res) => {
+    const { clientId, lawyerId, lawFirmId, appointmentDate, appointmentTime, gender, caseNotes } = req.body;
 
-  try {
-    // Validate the client exists
-    const client = await Client.findById(clientId);
-    if (!client) {
-      return res.status(404).json({ message: "Client not found." });
+    // Validate required fields
+    if (!clientId || !appointmentDate || !appointmentTime || !lawyerId || !lawFirmId) {
+        return res.status(400).json({ message: "Missing required fields: clientId, appointmentDate, appointmentTime, lawyerId, lawFirmId." });
     }
 
-    // Fetch the logged-in user's lawyer ID and law firm ID dynamically
-    const lawyerId = req.user.id; // Assuming the logged-in user is the lawyer
-    const lawFirm = await User.findById(req.user.createdBy, '_id role');
-    if (!lawFirm || lawFirm.role !== "law_firm") {
-      return res.status(404).json({ message: "Law firm not found or invalid role." });
+    try {
+        // Validate the client exists
+        const client = await Client.findById(clientId);
+        if (!client) {
+            return res.status(404).json({ message: "Client not found." });
+        }
+
+        // Validate the lawyer exists
+        const lawyer = await User.findById(lawyerId);
+        if (!lawyer) {
+            return res.status(404).json({ message: "Lawyer not found." });
+        }
+
+        // Validate the law firm exists
+        const lawFirm = await User.findById(lawFirmId);
+        if (!lawFirm || lawFirm.role !== "law_firm") {
+            return res.status(404).json({ message: "Law firm not found or invalid role." });
+        }
+
+        // Validate the appointment time slot
+        const existingAppointment = await Appointment.findOne({
+            lawyerId,
+            appointmentDate: new Date(appointmentDate),
+            appointmentTime,
+        });
+
+        if (existingAppointment) {
+            return res.status(400).json({ message: "This time slot is already booked." });
+        }
+
+        // Create the new appointment
+        const newAppointment = new Appointment({
+            clientId,
+            lawyerId,
+            lawFirmId,
+            appointmentDate: new Date(appointmentDate),
+            appointmentTime,
+            caseNotes: caseNotes || null,
+            gender: gender || null, // Optional fields
+        });
+
+        await newAppointment.save();
+        res.status(201).json({ message: "Appointment booked successfully.", appointment: newAppointment });
+    } catch (error) {
+        console.error("Error booking appointment:", error);
+        res.status(500).json({ message: "Failed to book appointment. Please try again later." });
     }
-
-    // Validate the appointment time slot
-    const existingAppointment = await Appointment.findOne({
-      lawyerId,
-      appointmentDate: new Date(appointmentDate),
-      appointmentTime,
-    });
-
-    if (existingAppointment) {
-      return res.status(400).json({ message: "This time slot is already booked." });
-    }
-
-    // Create the new appointment
-    const newAppointment = new Appointment({
-      clientId,
-      lawyerId,
-      lawFirmId: lawFirm._id,
-      appointmentDate: new Date(appointmentDate),
-      appointmentTime,
-      caseNotes: caseNotes || null,
-      gender: gender || null, // Optional fields
-    });
-
-    await newAppointment.save();
-    res.status(201).json({ message: "Appointment booked successfully.", appointment: newAppointment });
-  } catch (error) {
-    console.error("Error booking appointment:", error);
-    res.status(500).json({ message: "Failed to book appointment. Please try again later." });
-  }
 });
 
 
