@@ -395,7 +395,29 @@ router.get('/get-cases', authenticateToken, async (req, res) => {
     }
 });
 
+// API to get a single case by ID
+router.get('/get-case/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
 
+        // Find the case by its ID and ensure it belongs to the logged-in user
+        const caseDetail = await Case.findOne({ _id: id, createdBy: req.user.id });
+
+        if (!caseDetail) {
+            return res.status(404).json({ message: 'Case not found or you do not have permission to view it.' });
+        }
+
+        res.status(200).json(caseDetail);
+    } catch (error) {
+        console.error(error);
+
+        if (error.name === 'CastError') {
+            return res.status(400).json({ message: 'Invalid case ID format.' });
+        }
+
+        res.status(500).json({ message: 'Failed to retrieve the case. Please try again later.' });
+    }
+});
 
 // API to add client details
 router.post('/add-client', authenticateToken, async (req, res) => {
