@@ -474,6 +474,7 @@ router.delete('/delete-client/:id', authenticateToken, async (req, res) => {
 });
 
 
+
 router.post('/book-appointment', authenticateToken, async (req, res) => {
     const { clientId, lawyerId, lawFirmId, appointmentDate, appointmentTime, gender, caseNotes } = req.body;
 
@@ -490,7 +491,7 @@ router.post('/book-appointment', authenticateToken, async (req, res) => {
         }
 
         // Validate the lawyer exists
-        const lawyer = await User.findById(lawyerId);
+        const lawyer = await TeamMember.findById(lawyerId);
         if (!lawyer) {
             return res.status(404).json({ message: "Lawyer not found." });
         }
@@ -531,6 +532,7 @@ router.post('/book-appointment', authenticateToken, async (req, res) => {
     }
 });
 
+module.exports = router;
 
 
 // Get all appointments for the law firm
