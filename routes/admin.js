@@ -395,7 +395,29 @@ router.get('/get-cases', authenticateToken, async (req, res) => {
     }
 });
 
+// API to get a single case by ID
+router.get('/get-case/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
 
+        // Find the case by its ID and ensure it belongs to the logged-in user
+        const caseDetail = await Case.findOne({ _id: id, createdBy: req.user.id });
+
+        if (!caseDetail) {
+            return res.status(404).json({ message: 'Case not found or you do not have permission to view it.' });
+        }
+
+        res.status(200).json(caseDetail);
+    } catch (error) {
+        console.error(error);
+
+        if (error.name === 'CastError') {
+            return res.status(400).json({ message: 'Invalid case ID format.' });
+        }
+
+        res.status(500).json({ message: 'Failed to retrieve the case. Please try again later.' });
+    }
+});
 
 // API to add client details
 router.post('/add-client', authenticateToken, async (req, res) => {
@@ -473,86 +495,97 @@ router.delete('/delete-client/:id', authenticateToken, async (req, res) => {
     }
 });
 
+router.post("/book-appointment", authenticateToken, async (req, res) => {
+  const { 
+    clientId, 
+    appointmentDate, 
+    appointmentTime, 
+    gender, 
+    caseNotes 
+  } = req.body;
 
-router.post('/book-appointment', authenticateToken, async (req, res) => {
-    const { clientId, lawyerId, lawFirmId, appointmentDate, appointmentTime, gender, caseNotes } = req.body;
+  // Validate required fields
+  if (!clientId || !appointmentDate || !appointmentTime) {
+    return res.status(400).json({ message: "Missing required fields: clientId, appointmentDate, appointmentTime." });
+  }
 
-    // Validate required fields
-    if (!clientId || !appointmentDate || !appointmentTime || !lawyerId || !lawFirmId) {
-        return res.status(400).json({ message: "Missing required fields: clientId, appointmentDate, appointmentTime, lawyerId, lawFirmId." });
+  try {
+    // Validate the client exists
+    const client = await Client.findById(clientId);
+    if (!client) {
+      return res.status(404).json({ message: "Client not found." });
     }
 
-    try {
-        // Validate the client exists
-        const client = await Client.findById(clientId);
-        if (!client) {
-            return res.status(404).json({ message: "Client not found." });
-        }
-
-        // Validate the lawyer exists
-        const lawyer = await TeamMember.findById(lawyerId);
-        if (!lawyer) {
-            return res.status(404).json({ message: "Lawyer not found." });
-        }
-
-        // Validate the law firm exists
-        const lawFirm = await ImageForm.findById(lawFirmId);
-        if (!lawFirm) {
-            return res.status(404).json({ message: "Law firm not found." });
-        }
-
-        // Validate the appointment time slot
-        const existingAppointment = await Appointment.findOne({
-            lawyerId,
-            appointmentDate: new Date(appointmentDate),
-            appointmentTime,
-        });
-
-        if (existingAppointment) {
-            return res.status(400).json({ message: "This time slot is already booked." });
-        }
-
-        // Create the new appointment
-        const newAppointment = new Appointment({
-            clientId,
-            lawyerId,
-            lawFirmId,
-            appointmentDate: new Date(appointmentDate),
-            appointmentTime,
-            caseNotes: caseNotes || null,
-            gender: gender || null, // Optional fields
-        });
-
-        await newAppointment.save();
-        res.status(201).json({ message: "Appointment booked successfully.", appointment: newAppointment });
-    } catch (error) {
-        console.error("Error booking appointment:", error);
-        res.status(500).json({ message: "Failed to book appointment. Please try again later." });
+    // Fetch the logged-in user's lawyer ID and law firm ID dynamically
+    const lawyerId = req.user.id; // Assuming the logged-in user is the lawyer
+    const lawFirm = await User.findById(req.user.createdBy, '_id role');
+    if (!lawFirm || lawFirm.role !== "law_firm") {
+      return res.status(404).json({ message: "Law firm not found or invalid role." });
     }
-});
 
-//get appointments
+    // Validate the appointment time slot
+    const existingAppointment = await Appointment.findOne({
+      lawyerId,
+      appointmentDate: new Date(appointmentDate),
+      appointmentTime,
+    });
 
-router.get('/appointments/:lawyerId', authenticateToken, async (req, res) => {
-    const { lawyerId } = req.params;
-
-    try {
-        const appointments = await Appointment.find({ lawyerId })
-            .populate('clientId', 'name')
-            .populate('lawFirmId', 'lawFirmDetails.lawFirmName')
-            .sort({ appointmentDate: -1 });
-
-        res.status(200).json(appointments);
-    } catch (error) {
-        console.error('Error fetching appointments:', error);
-        res.status(500).json({ message: 'Failed to fetch appointments' });
+    if (existingAppointment) {
+      return res.status(400).json({ message: "This time slot is already booked." });
     }
+
+    // Create the new appointment
+    const newAppointment = new Appointment({
+      clientId,
+      lawyerId,
+      lawFirmId: lawFirm._id,
+      appointmentDate: new Date(appointmentDate),
+      appointmentTime,
+      caseNotes: caseNotes || null,
+      gender: gender || null, // Optional fields
+    });
+
+    await newAppointment.save();
+    res.status(201).json({ message: "Appointment booked successfully.", appointment: newAppointment });
+  } catch (error) {
+    console.error("Error booking appointment:", error);
+    res.status(500).json({ message: "Failed to book appointment. Please try again later." });
+  }
 });
 
 
 
+// Get all appointments for the law firm
+router.get('/appointments', authenticateToken, async (req, res) => {
+  try {
+    const appointments = await Appointment.find({ lawFirmId: req.user.id })
+      .populate('clientId', 'name')
+      .populate('caseId', 'caseType description')
+      .sort({ appointmentDate: -1 });
 
+    const formattedAppointments = appointments.map(apt => ({
+      id: apt._id,
+      title: "Appointment Request",
+      date: new Date(apt.appointmentDate).toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'long',
+        hour: 'numeric',
+        minute: 'numeric',
+      }),
+      status: apt.status, // 'pending', 'accepted', 'rejected'
+      client: {
+        name: apt.clientId.name,
+        caseType: apt.caseId?.caseType || 'New Consultation',
+        description: apt.caseId?.description || apt.caseNotes || 'New client consultation request',
+      }
+    }));
 
+    res.status(200).json(formattedAppointments);
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    res.status(500).json({ message: 'Failed to fetch appointments' });
+  }
+});
 
 // Update appointment status
 router.patch('/appointments/:id/status', authenticateToken, async (req, res) => {
@@ -607,45 +640,68 @@ router.get('/get-hearings', authenticateToken, async (req, res) => {
 });
 
 // API to add a new hearing
-const express = require('express');
-const router = express.Router();
-const HearingSchedule = require('../models/HearingSchedule');
-const Case = require('../models/Case');
-const User = require('../models/User');
+router.post('/add-hearing', authenticateToken, async (req, res) => {
+    const {
+        caseId,
+        date,
+        time,
+        location,
+        judge,
+        courtRoom,
+        opposingParty,
+        witnesses,
+        documents
+    } = req.body;
 
-// POST /api/hearing-schedule
-router.post('/', async (req, res) => {
-    const { userId, caseId, caseName, date, time } = req.body;
+    if (!caseId || !date || !time || !location) {
+        return res.status(400).json({ message: 'Missing required fields.' });
+    }
 
     try {
-        // Validate user and case existence
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+        // Verify case existence
+        const existingCase = await Case.findById(caseId);
+        if (!existingCase) {
+            return res.status(404).json({ message: 'Case not found.' });
         }
 
-        const caseItem = await Case.findById(caseId);
-        if (!caseItem) {
-            return res.status(404).json({ message: 'Case not found' });
-        }
+        // Validate time conflict
+        const startTime = new Date(`${date}T${time}`);
+        const endTime = new Date(startTime.getTime() + (60 * 60 * 1000)); // Default 1-hour duration
 
-        // Create new hearing schedule
-        const newHearingSchedule = new HearingSchedule({
-            userId,
+        const conflict = await Hearing.findOne({
             caseId,
-            caseName,
             date,
-            time,
+            $or: [
+                { time: { $gte: time, $lt: endTime.toISOString().split('T')[1] } },
+                { endTime: { $gte: time, $lt: endTime.toISOString().split('T')[1] } }
+            ]
         });
 
-        await newHearingSchedule.save();
-        res.status(201).json({ message: 'Hearing schedule created successfully', hearingSchedule: newHearingSchedule });
+        if (conflict) {
+            return res.status(400).json({ message: 'Hearing time conflicts with an existing schedule.' });
+        }
+
+        const newHearing = new Hearing({
+            caseId,
+            date,
+            time,
+            location,
+            judge,
+            courtRoom,
+            opposingParty,
+            witnesses,
+            documents,
+            createdBy: req.user.id,
+            caseType: existingCase.caseType
+        });
+
+        await newHearing.save();
+        res.status(201).json({ message: 'Hearing scheduled successfully', hearing: newHearing });
     } catch (error) {
-        console.error('Error creating hearing schedule:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error(error);
+        res.status(500).json({ message: 'Failed to schedule hearing.' });
     }
 });
-
 
 // API to get hearing details by ID
 router.get('/get-hearing/:id', authenticateToken, async (req, res) => {
