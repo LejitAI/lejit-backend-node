@@ -173,29 +173,36 @@ router.post('/login', async (req, res) => {
 // Fetch User Profile (Shared for all roles)
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
+        // Fetch user by ID
         const user = await User.findById(req.user.id).select('-password');
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // If it's a law firm, include team member details
+        // Fetch additional details for law firms
         let teamMemberDetails = null;
         if (user.role === 'law_firm') {
             teamMemberDetails = await TeamMember.findOne({ createdBy: user._id })
                 .select('-password');
         }
 
-        res.json({ 
+        // Return user profile
+        res.json({
             user: {
-                ...user.toObject(),
-                teamMemberDetails
-            }
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                law_firm_name: user.law_firm_name || null,
+                teamMemberDetails: teamMemberDetails || null,
+            },
         });
     } catch (error) {
-        console.error(error);
+        console.error('Error fetching profile:', error);
         res.status(500).json({ message: 'Failed to fetch user profile' });
     }
 });
+
 
 // (Optional) Admin validates the user (if needed in the future)
 router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req, res) => {
