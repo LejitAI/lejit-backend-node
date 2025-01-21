@@ -531,39 +531,28 @@ router.post('/book-appointment', authenticateToken, async (req, res) => {
     }
 });
 
+//get appointments
 
+router.get('/appointments/:lawyerId', authenticateToken, async (req, res) => {
+    const { lawyerId } = req.params;
 
-// Get all appointments for the law firm
-router.get('/appointments', authenticateToken, async (req, res) => {
-  try {
-    const appointments = await Appointment.find({ lawFirmId: req.user.id })
-      .populate('clientId', 'name')
-      .populate('caseId', 'caseType description')
-      .sort({ appointmentDate: -1 });
+    try {
+        const appointments = await Appointment.find({ lawyerId })
+            .populate('clientId', 'name')
+            .populate('lawFirmId', 'lawFirmDetails.lawFirmName')
+            .sort({ appointmentDate: -1 });
 
-    const formattedAppointments = appointments.map(apt => ({
-      id: apt._id,
-      title: "Appointment Request",
-      date: new Date(apt.appointmentDate).toLocaleDateString('en-US', {
-        day: 'numeric',
-        month: 'long',
-        hour: 'numeric',
-        minute: 'numeric',
-      }),
-      status: apt.status, // 'pending', 'accepted', 'rejected'
-      client: {
-        name: apt.clientId.name,
-        caseType: apt.caseId?.caseType || 'New Consultation',
-        description: apt.caseId?.description || apt.caseNotes || 'New client consultation request',
-      }
-    }));
-
-    res.status(200).json(formattedAppointments);
-  } catch (error) {
-    console.error('Error fetching appointments:', error);
-    res.status(500).json({ message: 'Failed to fetch appointments' });
-  }
+        res.status(200).json(appointments);
+    } catch (error) {
+        console.error('Error fetching appointments:', error);
+        res.status(500).json({ message: 'Failed to fetch appointments' });
+    }
 });
+
+
+
+
+
 
 // Update appointment status
 router.patch('/appointments/:id/status', authenticateToken, async (req, res) => {
