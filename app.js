@@ -5,6 +5,8 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const chatRoutes = require('./routes/chat');
+const ttsRoute = require('./routes/tts');
+const speechToTextRoute = require('./routes/speech-to-text');
 
 const cors=require("cors");
 const corsOptions ={
@@ -29,6 +31,11 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
+
+
+// Add the new routes
+app.use('/api/tts', ttsRoute);
+app.use('/api/speech-to-text', speechToTextRoute);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
