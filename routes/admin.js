@@ -10,7 +10,7 @@ const Case = require('../models/Case'); // Import Case model
 const ImageForm = require('../models/LawFirm');
 const Client = require('../models/Client');
 const Appointment = require("../models/Appointment");
-const Hearing = require('../models/Hearing');
+const Hearing = require('../models/HearingSchedule');
 
 
 // Add or update ChatGPT API key
