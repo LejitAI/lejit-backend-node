@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const TeamMember = require('../models/TeamMember');
 const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
 const router = express.Router();
 
@@ -46,7 +47,71 @@ router.post('/register', async (req, res) => {
         });
 
         await newUser.save();
-        res.status(201).json({ message: `${role} registered successfully` });
+
+        // If it's a law firm user, create a team member entry
+        if (role === 'law_firm') {
+            const teamMember = new TeamMember({
+                personalDetails: {
+                    name: username,
+                    email: email,
+                    mobile: '',
+                    gender: '',
+                    yearsOfExperience: 0,
+                    address: {
+                        line1: '',
+                        line2: '',
+                        city: '',
+                        state: '',
+                        country: '',
+                        postalCode: '',
+                    }
+                },
+                professionalDetails: {
+                    lawyerType: 'Owner',
+                    governmentID: '',
+                    degreeType: '',
+                    degreeInstitution: '',
+                    specialization: '',
+                },
+                bankAccountDetails: {
+                    paymentMethod: 'Card',
+                    cardDetails: {
+                        cardNumber: '',
+                        expirationDate: '',
+                        cvv: '',
+                        saveCard: false,
+                    },
+                    bankDetails: {
+                        accountNumber: '',
+                        bankName: '',
+                        ifscCode: '',
+                    },
+                    upiId: '',
+                },
+                password: password,
+                createdBy: newUser._id
+            });
+
+            await teamMember.save();
+        }
+
+        // Generate token without expiration
+        const token = jwt.sign(
+            { id: newUser._id, role: newUser.role },
+            process.env.JWT_SECRET
+        );
+
+        res.status(201).json({ 
+            message: `${role} registered successfully`,
+            token,
+            user: {
+                id: newUser._id,
+                username: newUser.username,
+                email: newUser.email,
+                role: newUser.role,
+                law_firm_name: newUser.law_firm_name
+            }
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to register user. Please try again later.' });
@@ -74,9 +139,31 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Incorrect password' });
         }
 
-        // Generate token
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.json({ token, role: user.role });
+        // Generate token without expiration
+        const token = jwt.sign(
+            { id: user._id, role: user.role },
+            process.env.JWT_SECRET
+        );
+        
+        // Get team member details if it's a law firm
+        let teamMemberDetails = null;
+        if (user.role === 'law_firm') {
+            teamMemberDetails = await TeamMember.findOne({ 'personalDetails.email': email })
+                .select('-password');
+        }
+
+        res.json({ 
+            token, 
+            role: user.role,
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                law_firm_name: user.law_firm_name,
+                teamMemberDetails: teamMemberDetails
+            }
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to log in. Please try again later.' });
@@ -90,7 +177,20 @@ router.get('/profile', authenticateToken, async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-        res.json({ user });
+
+        // If it's a law firm, include team member details
+        let teamMemberDetails = null;
+        if (user.role === 'law_firm') {
+            teamMemberDetails = await TeamMember.findOne({ createdBy: user._id })
+                .select('-password');
+        }
+
+        res.json({ 
+            user: {
+                ...user.toObject(),
+                teamMemberDetails
+            }
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to fetch user profile' });
