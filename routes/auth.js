@@ -5,6 +5,8 @@ const User = require('../models/User');
 const TeamMember = require('../models/TeamMember');
 const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
 const router = express.Router();
+const ImageForm = require('../models/LawFirm'); // Import the LawFirm model
+
 
 // Register a new user (Citizen, Law Firm, Corporate)
 router.post('/register', async (req, res) => {
@@ -48,30 +50,33 @@ router.post('/register', async (req, res) => {
 
         await newUser.save();
 
-        // If it's a law firm user, create a team member entry
+        // If it's a law firm user, create a law firm entry
         if (role === 'law_firm') {
-            const teamMember = new TeamMember({
-                personalDetails: {
-                    name: username,
-                    email: email,
-                    mobile: '',
-                    gender: '',
-                    yearsOfExperience: 0,
-                    address: {
-                        line1: '',
-                        line2: '',
-                        city: '',
-                        state: '',
-                        country: '',
-                        postalCode: '',
-                    }
+            const lawFirmDetails = new ImageForm({
+                lawFirmDetails: {
+                    lawFirmName: law_firm_name,
+                    operatingSince: '2023', // Example data, replace with actual input
+                    yearsOfExperience: '10', // Example data, replace with actual input
+                    specialization: 'General Practice', // Example data, replace with actual input
+                    contactInfo: {
+                        email: email,
+                        mobile: '1234567890', // Example data, replace with actual input
+                        address: {
+                            line1: '123 Main St', // Example data, replace with actual input
+                            city: 'City', // Example data, replace with actual input
+                            state: 'State', // Example data, replace with actual input
+                            postalCode: '12345', // Example data, replace with actual input
+                        },
+                    },
                 },
                 professionalDetails: {
                     lawyerType: 'Owner',
-                    governmentID: '',
-                    degreeType: '',
-                    degreeInstitution: '',
-                    specialization: '',
+                    caseDetails: {
+                        caseSolvedCount: 0,
+                        caseBasedBillRate: '100',
+                        timeBasedBillRate: '50',
+                        previousCases: [],
+                    },
                 },
                 bankAccountDetails: {
                     paymentMethod: 'Card',
@@ -88,11 +93,10 @@ router.post('/register', async (req, res) => {
                     },
                     upiId: '',
                 },
-                password: password,
-                createdBy: newUser._id
+                createdBy: newUser._id,
             });
 
-            await teamMember.save();
+            await lawFirmDetails.save();
         }
 
         // Generate token without expiration
@@ -118,6 +122,7 @@ router.post('/register', async (req, res) => {
     }
 });
 
+module.exports = router;
 // Login (Shared for all roles)
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
