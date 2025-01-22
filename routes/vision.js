@@ -1,13 +1,14 @@
 const express = require('express');
 const multer = require('multer');
 const { OpenAI } = require('openai');
+require('dotenv').config();
 const fs = require('fs');
 const router = express.Router();
 
 const upload = multer({ dest: 'uploads/' });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-router.post('/vision', upload.single('image'), async (req, res) => {
+router.post('/', upload.single('image'), async (req, res) => {
     try {
         const imagePath = req.file.path;
         const imageBase64 = fs.readFileSync(imagePath, { encoding: 'base64' });
