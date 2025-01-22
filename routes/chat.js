@@ -7,18 +7,39 @@ const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 const OpenAI = require('openai');
 
+const TAGS_FILE = path.join(__dirname, 'caseTags.json');
+
+// Load tags from local JSON file
+const loadTags = () => {
+    if (fs.existsSync(TAGS_FILE)) {
+        const data = fs.readFileSync(TAGS_FILE, 'utf-8');
+        return JSON.parse(data);
+    }
+    return {};
+};
+
+// Save tags to local JSON file
+const saveTags = (tags) => {
+    fs.writeFileSync(TAGS_FILE, JSON.stringify(tags, null, 2), 'utf-8');
+};
+
+let caseTags = loadTags();
+
 // Set up multer for file uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const userId = req.user.id; // Assuming the user ID is available in the authenticated request
-        const userDirectory = path.join('uploads', userId.toString());
+        const { caseId } = req.body;
+        if (!caseId) {
+            return cb(new Error('caseId is required'), null);
+        }
+        const caseDirectory = path.join('uploads', caseId.toString());
 
-        // Create user-specific directory if it doesn't exist
-        if (!fs.existsSync(userDirectory)) {
-            fs.mkdirSync(userDirectory, { recursive: true });
+        // Create case-specific directory if it doesn't exist
+        if (!fs.existsSync(caseDirectory)) {
+            fs.mkdirSync(caseDirectory, { recursive: true });
         }
 
-        cb(null, userDirectory);
+        cb(null, caseDirectory);
     },
     filename: (req, file, cb) => {
         cb(null, `${Date.now()}-${file.originalname}`);
@@ -41,15 +62,29 @@ const upload = multer({
 
 // Document upload endpoint
 router.post('/upload', authenticateToken, upload.single('document'), (req, res) => {
+    const { caseId, tags } = req.body;
+
     if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded. Please attach a document.' });
     }
 
+    if (!caseId) {
+        return res.status(400).json({ message: 'caseId is required.' });
+    }
+
     try {
-        // Process the uploaded file as needed
+        // Store tags for the case
+        if (tags) {
+            const tagArray = tags.split(',').map(tag => tag.trim());
+            caseTags[caseId] = (caseTags[caseId] || []).concat(tagArray);
+            saveTags(caseTags);
+        }
+
         res.status(200).json({
             message: 'File uploaded successfully!',
-            filePath: req.file.path
+            filePath: req.file.path,
+            caseId: caseId,
+            tags: tags ? tags.split(',').map(tag => tag.trim()) : []
         });
     } catch (error) {
         console.error(error);
@@ -57,63 +92,35 @@ router.post('/upload', authenticateToken, upload.single('document'), (req, res) 
     }
 });
 
-// Retrieve documents for a user
+// Document retrieval endpoint
 router.get('/documents', authenticateToken, (req, res) => {
-    const userId = req.user.id; // Assuming the user ID is available in the authenticated request
-    const userDirectory = path.join('uploads', userId.toString());
+    const { caseId } = req.query;
+
+    if (!caseId) {
+        return res.status(400).json({ message: 'caseId is required.' });
+    }
+
+    const caseDirectory = path.join('uploads', caseId.toString());
 
     try {
-        if (!fs.existsSync(userDirectory)) {
-            return res.status(404).json({ message: 'No documents found for this user.' });
+        if (!fs.existsSync(caseDirectory)) {
+            return res.status(404).json({ message: 'No documents found for this case.' });
         }
 
-        const files = fs.readdirSync(userDirectory).map(file => ({
+        const files = fs.readdirSync(caseDirectory).map(file => ({
             name: file,
-            path: path.join(userDirectory, file)
+            url: `${req.protocol}://${req.get('host')}/backend/uploads/${caseId}/${encodeURIComponent(file)}`
         }));
 
         res.status(200).json({
             message: 'Documents retrieved successfully!',
-            documents: files
+            documents: files,
+            caseId: caseId,
+            tags: caseTags[caseId] || []
         });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error occurred while retrieving documents.' });
-    }
-});
-
-// Chat with ChatGPT (validated users only)
-router.post('/chat', authenticateToken, async (req, res) => {
-    const { message } = req.body;
-
-    if (!message) {
-        return res.status(400).json({ message: 'Message is required' });
-    }
-
-    try {
-        // Get the stored ChatGPT API key from settings
-        const settings = await Settings.findOne();
-
-        if (!settings || !settings.chatgptApiKey) {
-            return res.status(404).json({ message: 'ChatGPT API key not found. Please contact the admin.' });
-        }
-
-        // Initialize OpenAI with the API key
-        const openai = new OpenAI({
-            apiKey: settings.chatgptApiKey, // Use the key from the settings
-        });
-
-        // Make a request to OpenAI using the official client
-        const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo", // Adjust this model as needed
-            messages: [{ role: "user", content: message }]
-        });
-
-        // Return the response from OpenAI's API to the user
-        res.status(200).json(completion);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error occurred while communicating with ChatGPT' });
     }
 });
 
