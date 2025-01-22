@@ -8,20 +8,18 @@ const chatRoutes = require('./routes/chat');
 const ttsRoute = require('./routes/tts');
 const speechToTextRoute = require('./routes/speech-to-text');
 const hearingScheduleRoutes = require('./routes/hearingSchedule');
+const visionRoutes = require('./routes/vision'); // Added from 1
+const formatRoutes = require('./routes/format'); // Added from 1
 
-
-const cors=require("cors");
-const corsOptions ={
-   origin:'*', 
-   credentials:true,            //access-control-allow-credentials:true
-   optionSuccessStatus:200,
-}
+const cors = require("cors");
+const corsOptions = {
+   origin: '*', 
+   credentials: true,            // access-control-allow-credentials:true
+   optionSuccessStatus: 200,
+};
 dotenv.config();
 const app = express();
-app.use(cors(corsOptions)) // Use this after the variable declaration
-
-
-
+app.use(cors(corsOptions)); // Use this after the variable declaration
 
 // Connect to MongoDB
 connectDB();
@@ -33,16 +31,14 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
-
-
-// Add the new routes
 app.use('/api/tts', ttsRoute);
 app.use('/api/speech-to-text', speechToTextRoute);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/hearing-schedule', hearingScheduleRoutes);
-
+app.use('/api', visionRoutes); // Added from 1
+app.use('/api', formatRoutes); // Added from 1
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
