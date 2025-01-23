@@ -6,6 +6,11 @@ const Settings = require('../models/Settings');
 const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 const OpenAI = require('openai');
+const axios = require('axios');
+const FormData = require('form-data');
+
+
+const CaseArgs = require('../models/CaseArgs');
 
 const TAGS_FILE = path.join(__dirname, 'caseTags.json');
 
@@ -123,5 +128,89 @@ router.get('/documents', authenticateToken, (req, res) => {
         res.status(500).json({ message: 'Error occurred while retrieving documents.' });
     }
 });
+
+router.get('/get-case-arguments', authenticateToken, async (req, res) => {
+    const { caseId } = req.query;
+
+
+    try {
+        const dirPath = path.join('./uploads', caseId);
+        console.log(dirPath);
+        if (!fs.existsSync(dirPath)) {
+            return res.status(400).json({ message: 'No documents uploaded' });
+        }
+
+        let caseDoc = await CaseArgs.findOne({ caseId });
+
+        if (!caseDoc) {
+            // Call first API with file upload
+            const form = new FormData();
+            // Append all files in the directory to the form
+            fs.readdirSync(dirPath).forEach(file => {
+                console.log('Adding file:', file); // Log to confirm
+                form.append('files', fs.createReadStream(path.join(dirPath, file)));
+            });
+
+
+
+            const response1 = await axios.post(
+                'http://backend.lejit.ai/api/api/citation/feed-documents/?session_id=unique_session_identifier_12345',
+                form,
+                { headers: form.getHeaders() }
+            );
+
+
+            if (response1.status === 200) {
+                // Call second API
+                const response2 = await axios.post(
+                    'http://backend.lejit.ai/api/api/citation/query',
+                    {
+                        session_id: 'unique_session_identifier_12345',
+                        question: 'give some arguments'
+                    }
+                )
+                console.log(response2.data.response);
+
+                // Save to MongoDB
+                caseDoc = new CaseArgs({
+                    caseId,
+                    arguments:response2.data.response // Remove any null values
+                });
+                await caseDoc.save();
+            }
+        }
+
+        res.json({ caseId, arguments: caseDoc.arguments });
+    } catch (error) {
+        console.error('Error details:', error.response?.data || error.message);
+
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// Delete Current Arguments
+router.delete('/delete-case-arguments', authenticateToken, async (req, res) => {
+    const { caseId } = req.query; // Retrieve the caseId from the query parameters
+
+    if (!caseId) {
+        return res.status(400).json({ message: 'caseId is required' });
+    }
+
+    try {
+        // Find and delete the document associated with the caseId
+        const deletedCase = await CaseArgs.findOneAndDelete({ caseId });
+
+        if (!deletedCase) {
+            return res.status(404).json({ message: 'No arguments found for the provided caseId' });
+        }
+
+        res.status(200).json({ message: `Arguments for caseId ${caseId} have been successfully deleted` });
+    } catch (error) {
+        console.error('Error deleting case arguments:', error.message);
+        res.status(500).json({ message: 'An error occurred while deleting case arguments', error: error.message });
+    }
+});
+
 
 module.exports = router;
