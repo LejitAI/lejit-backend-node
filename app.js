@@ -43,8 +43,8 @@ app.use('/api/speech-to-text', speechToTextRoute);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
-app.use('/api', visionRoutes);
-app.use('/api', formatRoutes);
+app.use('/api/vision', visionRoutes);
+app.use('/api/format', formatRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
