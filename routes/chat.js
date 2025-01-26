@@ -39,24 +39,44 @@ const upload = multer({
     }
 });
 
-// Document upload endpoint
+// Document upload endpoint with metadata
 router.post('/upload', authenticateToken, upload.single('document'), (req, res) => {
+    const { keywords } = req.body; // Keywords from the request body
+
     if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded. Please attach a document.' });
     }
 
+    if (!keywords || !Array.isArray(keywords)) {
+        return res.status(400).json({ message: 'Keywords are required and must be an array.' });
+    }
+
     try {
-        // Process the uploaded file as needed
+        const userId = req.user.id;
+        const filePath = req.file.path;
+
+        // Save metadata to a separate JSON file or database
+        const metadata = {
+            keywords,
+            uploadedAt: new Date().toISOString(),
+            filePath: filePath
+        };
+
+        const metadataFilePath = path.join('uploads', userId.toString(), `${req.file.filename}-metadata.json`);
+        fs.writeFileSync(metadataFilePath, JSON.stringify(metadata, null, 2));
+
         res.status(200).json({
-            message: 'File uploaded successfully!',
-            filePath: req.file.path
+            message: 'File uploaded successfully with metadata!',
+            filePath: req.file.path,
+            metadata
         });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Error occurred while uploading the file.' });
+        res.status(500).json({ message: 'Error occurred while uploading the file and saving metadata.' });
     }
 });
 
+// Fetch documents with metadata
 router.get('/documents', authenticateToken, (req, res) => {
     const userId = req.user.id; // Authenticated user ID
     const userDirectory = path.join('uploads', userId.toString());
@@ -66,10 +86,22 @@ router.get('/documents', authenticateToken, (req, res) => {
             return res.status(404).json({ message: 'No documents found for this user.' });
         }
 
-        const files = fs.readdirSync(userDirectory).map(file => ({
-            name: file,
-            url: `${req.protocol}://${req.get('host')}/uploads/${userId}/${encodeURIComponent(file)}`
-        }));
+        const files = fs.readdirSync(userDirectory)
+            .filter(file => !file.endsWith('-metadata.json')) // Exclude metadata files
+            .map(file => {
+                const metadataFilePath = path.join(userDirectory, `${file}-metadata.json`);
+                let metadata = null;
+
+                if (fs.existsSync(metadataFilePath)) {
+                    metadata = JSON.parse(fs.readFileSync(metadataFilePath, 'utf8'));
+                }
+
+                return {
+                    name: file,
+                    url: `${req.protocol}://${req.get('host')}/uploads/${userId}/${encodeURIComponent(file)}`,
+                    metadata
+                };
+            });
 
         res.status(200).json({
             message: 'Documents retrieved successfully!',
@@ -80,7 +112,5 @@ router.get('/documents', authenticateToken, (req, res) => {
         res.status(500).json({ message: 'Error occurred while retrieving documents.' });
     }
 });
-
-
 
 module.exports = router;
