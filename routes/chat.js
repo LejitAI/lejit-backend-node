@@ -132,11 +132,14 @@ router.get('/documents', authenticateToken, (req, res) => {
 router.get('/get-case-arguments', authenticateToken, async (req, res) => {
     const { caseId } = req.query;
 
+    if (!caseId) {
+        return res.status(400).json({ message: 'Invalid caseId' });
+    }
 
     try {
         const dirPath = path.resolve('./uploads', caseId);
-        console.log(dirPath);
-        
+        console.log(`dirPath: ${dirPath}`);
+
         if (!fs.existsSync(dirPath)) {
             return res.status(400).json({ message: 'No documents uploaded' });
         }
@@ -144,48 +147,63 @@ router.get('/get-case-arguments', authenticateToken, async (req, res) => {
         let caseDoc = await CaseArgs.findOne({ caseId });
 
         if (!caseDoc) {
-            // Call first API with file upload
+            const sessionId = `${caseId}_${Date.now()}`;
             const form = new FormData();
-            // Append all files in the directory to the form
-            fs.readdirSync(dirPath).forEach(file => {
-                console.log('Adding file:', file); // Log to confirm
-                form.append('files', fs.createReadStream(path.join(dirPath, file)));
-            });
 
-
-
-            const response1 = await axios.post(
-                'http://backend.lejit.ai/api/api/citation/feed-documents/?session_id=unique_session_identifier_12345',
-                form,
-                { headers: form.getHeaders() }
-            );
-
-
-            if (response1.status === 200) {
-                // Call second API
-                const response2 = await axios.post(
-                    'http://backend.lejit.ai/api/api/citation/query',
-                    {
-                        session_id: 'unique_session_identifier_12345',
-                        question: 'give some arguments'
-                    }
-                )
-                console.log(response2.data.response);
-
-                // Save to MongoDB
-                caseDoc = new CaseArgs({
-                    caseId,
-                    arguments:response2.data.response // Remove any null values
+            // Append files to the form
+            try {
+                fs.readdirSync(dirPath).forEach(file => {
+                    console.log(`Adding file: ${file}`);
+                    form.append('files', fs.createReadStream(path.join(dirPath, file)));
                 });
-                await caseDoc.save();
+            } catch (readError) {
+                console.error('Error reading files:', readError.message);
+                return res.status(500).json({ message: 'Error reading files', error: readError.message });
+            }
+
+            // Call the first API
+            try {
+                const response1 = await axios.post(
+                    `http://backend.lejit.ai/api/api/citation/feed-documents/?session_id=${sessionId}`,
+                    form,
+                    { headers: form.getHeaders() }
+                );
+
+                if (response1.status === 200) {
+                    // Call the second API
+                    const response2 = await axios.post(
+                        'http://backend.lejit.ai/api/api/citation/query',
+                        {
+                            session_id: sessionId,
+                            question: 'give some arguments'
+                        }
+                    );
+
+                    console.log('Arguments Response:', response2.data.response);
+
+                    // Save to MongoDB
+                    caseDoc = new CaseArgs({
+                        caseId,
+                        arguments: response2.data.response
+                    });
+
+                    try {
+                        await caseDoc.save();
+                    } catch (dbError) {
+                        console.error('Error saving to MongoDB:', dbError.message);
+                        return res.status(500).json({ message: 'Database save failed', error: dbError.message });
+                    }
+                }
+            } catch (apiError) {
+                console.error('Error in API calls:', apiError.response?.data || apiError.message);
+                return res.status(500).json({ message: 'Error in external API calls', error: apiError.message });
             }
         }
 
         res.json({ caseId, arguments: caseDoc.arguments });
     } catch (error) {
-        console.error('Error details:', error.response?.data || error.message);
-
-        res.status(500).json({ error: error.message });
+        console.error('Unhandled Error:', error.response?.data || error.message || error);
+        res.status(500).json({ message: 'Internal server error', error: error.message });
     }
 });
 
