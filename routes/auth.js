@@ -11,23 +11,19 @@ router.post('/register', async (req, res) => {
     const { role, username, email, password, confirmPassword, law_firm_name, company_name } = req.body;
 
     try {
-        // Validate required fields
         if (!role || !username || !email || !password || !confirmPassword) {
             return res.status(400).json({ message: 'All fields are required' });
         }
 
-        // Ensure passwords match
         if (password !== confirmPassword) {
             return res.status(400).json({ message: 'Passwords do not match' });
         }
 
-        // Check if email already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: 'Email or Username is already registered' });
         }
 
-        // Additional role-specific validations
         if (role === 'law_firm' && !law_firm_name) {
             return res.status(400).json({ message: 'Law firm name is required for law firms' });
         }
@@ -36,7 +32,6 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'Company name is required for corporates' });
         }
 
-        // Create and save new user
         const newUser = new User({
             role,
             username,
@@ -48,7 +43,6 @@ router.post('/register', async (req, res) => {
 
         await newUser.save();
 
-        // If it's a law firm user, create a team member entry
         if (role === 'law_firm') {
             const teamMember = new TeamMember({
                 personalDetails: {
@@ -95,7 +89,6 @@ router.post('/register', async (req, res) => {
             await teamMember.save();
         }
 
-        // Generate token without expiration
         const token = jwt.sign(
             { id: newUser._id, role: newUser.role },
             process.env.JWT_SECRET
@@ -118,28 +111,25 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// Login (Shared for all roles)
+
+//login
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        // Validate required fields
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required' });
         }
 
-        // Check if user exists
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(401).json({ message: 'User not found. Please register first.' });
         }
 
-        // Validate password
         if (!(await user.matchPassword(password))) {
             return res.status(401).json({ message: 'Incorrect password' });
         }
 
-        // Generate token without expiration
         const token = jwt.sign(
             { id: user._id, role: user.role },
             process.env.JWT_SECRET
@@ -170,23 +160,22 @@ router.post('/login', async (req, res) => {
     }
 });
 
+
+
 // Fetch User Profile (Shared for all roles)
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
-        // Fetch user by ID
         const user = await User.findById(req.user.id).select('-password');
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Fetch additional details for law firms
         let teamMemberDetails = null;
         if (user.role === 'law_firm') {
             teamMemberDetails = await TeamMember.findOne({ createdBy: user._id })
                 .select('-password');
         }
 
-        // Return user profile
         res.json({
             user: {
                 id: user._id,
@@ -204,16 +193,14 @@ router.get('/profile', authenticateToken, async (req, res) => {
 });
 
 
-// (Optional) Admin validates the user (if needed in the future)
+//Admin validates the user (future)
 router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req, res) => {
     try {
-        // Find user by ID
         const user = await User.findById(req.params.id);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Update validation status
         user.validated = true;
         await user.save();
         res.json({ message: `${user.role} validated successfully` });
@@ -223,10 +210,10 @@ router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req
     }
 });
 
-// Add this new route to your existing auth.js
+
+//signout
 router.post('/signout', authenticateToken, async (req, res) => {
     try {
-        // You could implement a token blacklist here if needed
         res.status(200).json({ message: 'Signed out successfully' });
     } catch (error) {
         console.error(error);
