@@ -782,6 +782,33 @@ router.get('/get-upcoming-hearings', authenticateToken, async (req, res) => {
     }
 });
 
+// Update timer for a case
+router.put('/update-case-timer/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { timer, isRunning } = req.body;
+
+    if (typeof timer !== 'number' || typeof isRunning !== 'boolean') {
+        return res.status(400).json({ message: 'Invalid timer or isRunning value.' });
+    }
+
+    try {
+        const updatedCase = await Case.findOneAndUpdate(
+            { _id: id, createdBy: req.user.id },
+            { timer, isRunning },
+            { new: true }
+        );
+
+        if (!updatedCase) {
+            return res.status(404).json({ message: 'Case not found or access denied.' });
+        }
+
+        res.status(200).json({ message: 'Timer updated successfully', case: updatedCase });
+    } catch (error) {
+        console.error('Error updating timer:', error);
+        res.status(500).json({ message: 'Failed to update timer. Please try again later.' });
+    }
+});
+
 
 
 module.exports = router;
