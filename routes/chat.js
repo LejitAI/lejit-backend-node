@@ -134,8 +134,9 @@ router.get('/get-case-arguments', authenticateToken, async (req, res) => {
 
 
     try {
-        const dirPath = path.join('./uploads', caseId);
+        const dirPath = path.resolve('./uploads', caseId);
         console.log(dirPath);
+        
         if (!fs.existsSync(dirPath)) {
             return res.status(400).json({ message: 'No documents uploaded' });
         }
