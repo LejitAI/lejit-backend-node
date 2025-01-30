@@ -10,6 +10,7 @@ const speechToTextRoute = require('./routes/speech-to-text');
 const visionRoutes = require('./routes/vision');
 const formatRoutes = require('./routes/format');
 const hearingScheduleRoutes = require('./routes/hearingSchedule');
+const adminModuleRoutes = require('./routes/adminModule');
 
 
 
@@ -48,6 +49,8 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/vision', visionRoutes);
 app.use('/api/format', formatRoutes);
 app.use('/api/hearing-schedule', hearingScheduleRoutes);
+app.use('/api/adminModule', adminModuleRoutes);
+
 
 
 const PORT = process.env.PORT || 5000;
