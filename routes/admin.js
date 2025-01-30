@@ -10,6 +10,8 @@ const Case = require('../models/Case'); // Import Case model
 const ImageForm = require('../models/LawFirm');
 const Client = require('../models/Client');
 const Appointment = require("../models/Appointment");
+const { pool } = require('../config/db'); // PostgreSQL connection
+const HearingSchedule = require('../models/HearingSchedule');
 
 
 
@@ -66,48 +68,57 @@ router.get('/get-chatgpt-api-key', authenticateToken, async (req, res) => {
 });
 
 
-// API to add a new team member by an admin
 router.post('/add-team-member', authenticateToken, async (req, res) => {
     const {
-        personalDetails,
-        professionalDetails,
-        bankAccountDetails,
+        personalDetails = {},
+        professionalDetails = {},
+        bankAccountDetails = {},
         password
     } = req.body;
 
     try {
-        // Create and save new team member
-        const newTeamMember = new TeamMember({
-            personalDetails,
+        // Validate required fields
+        if (!personalDetails.name || !personalDetails.email || !password) {
+            return res.status(400).json({ message: 'Name, email, and password are required.' });
+        }
+
+        // Ensure `address` exists
+        personalDetails.address = personalDetails.address || { 
+            line1: "", line2: "", city: "", state: "", country: "", postalCode: "" 
+        };
+
+        // Call PostgreSQL model function
+        const newTeamMember = await TeamMember.createTeamMember({
+            name: personalDetails.name,
+            dateOfBirth: personalDetails.dateOfBirth,
+            gender: personalDetails.gender,
+            yearsOfExperience: personalDetails.yearsOfExperience,
+            mobile: personalDetails.mobile,
+            email: personalDetails.email,
+            address: personalDetails.address,
             professionalDetails,
             bankAccountDetails,
             password,
             createdBy: req.user.id,
         });
 
-        await newTeamMember.save();
         res.status(201).json({ message: 'Team member added successfully', teamMember: newTeamMember });
+
     } catch (error) {
-        // Handle unique email constraint error
-        if (error.code === 11000 && error.keyPattern && error.keyPattern['personalDetails.email']) {
+        if (error.code === '23505') { // Unique constraint violation for email
             return res.status(400).json({ message: 'Email is already in use. Please use a different email.' });
         }
         console.error(error);
         res.status(500).json({ message: 'Failed to add team member. Please try again later.' });
     }
-    
 });
 
-// API to delete a team member
 router.delete('/delete-team-member/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     try {
-        // Find and delete the team member created by the logged-in user
-        const deletedMember = await TeamMember.findOneAndDelete({
-            _id: id,
-            createdBy: req.user.id
-        });
+        // Call model function to delete the team member
+        const deletedMember = await TeamMember.deleteTeamMember(id, req.user.id);
 
         if (!deletedMember) {
             return res.status(404).json({ message: 'Team member not found or access denied.' });
@@ -115,22 +126,33 @@ router.delete('/delete-team-member/:id', authenticateToken, async (req, res) => 
 
         res.status(200).json({ message: 'Team member deleted successfully.' });
     } catch (error) {
-        console.error(error);
+        console.error('Error deleting team member:', error);
         res.status(500).json({ message: 'Failed to delete team member. Please try again later.' });
     }
 });
 
-// API to get team member details by ID
 router.get('/get-team-member-details/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     try {
-        // Find the team member by ID
-        const teamMember = await TeamMember.findById(id).select('-password');
+        // Query PostgreSQL to find the team member by ID
+        const query = `
+            SELECT id, name, date_of_birth, gender, years_of_experience, mobile, email, 
+                   address_line1, address_line2, city, state, country, postal_code,
+                   lawyer_type, government_id, degree_type, degree_institution, specialization,
+                   payment_method, card_number, expiration_date, cvv, save_card, 
+                   account_number, bank_name, ifsc_code, upi_id, created_by, created_at
+            FROM team_members 
+            WHERE id = $1
+        `;
+        const result = await pool.query(query, [id]);
 
-        if (!teamMember) {
+        if (result.rows.length === 0) {
             return res.status(404).json({ message: 'Team member not found.' });
         }
+
+        // Remove sensitive data (e.g., password) from the response
+        const teamMember = result.rows[0];
 
         res.status(200).json(teamMember);
     } catch (error) {
@@ -152,38 +174,29 @@ router.get('/get-law-firms', authenticateToken, async (req, res) => {
 });
 
 
-// API to fetch team members by law firm ID
-router.get('/get-team-members-by-law-firm/:lawFirmId', authenticateToken, async (req, res) => {
-    const { lawFirmId } = req.params;
-
-    try {
-        const teamMembers = await TeamMember.find({ createdBy: lawFirmId }).populate('createdBy', 'law_firm_name');
-
-        if (teamMembers.length === 0) {
-            return res.status(404).json({ message: 'No team members found for this law firm.' });
-        }
-
-        res.status(200).json(teamMembers);
-    } catch (error) {
-        console.error('Error fetching team members:', error);
-        res.status(500).json({ message: 'Failed to fetch team members. Please try again later.' });
-    }
-});
-
 
 //get all law firms
 // routes/admin.js
 // API to get all law firm details
 router.get('/get-all-law-firms', authenticateToken, async (req, res) => {
     try {
-        // Fetch all law firms from the ImageForm schema
-        const lawFirms = await ImageForm.find({}, 'lawFirmDetails professionalDetails bankAccountDetails createdAt createdBy');
+        // Query PostgreSQL to get all law firms
+        const query = `
+            SELECT id, law_firm_name, operating_since, years_of_experience, specialization,
+                   email, mobile, address_line1, address_line2, city, state, postal_code,
+                   lawyer_type, case_solved_count, case_based_bill_rate, time_based_bill_rate,
+                   payment_method, card_number, expiration_date, cvv, save_card,
+                   account_number, bank_name, ifsc_code, upi_id, created_at, created_by
+            FROM image_forms
+            ORDER BY created_at DESC;
+        `;
+        const result = await pool.query(query);
 
-        if (!lawFirms || lawFirms.length === 0) {
-            return res.status(404).json({ message: 'No law firms found.' });
-        }
+        // if (result.rows.length === 0) {
+        //     return res.status(404).json({ message: 'No law firms found.' });
+        // }
 
-        res.status(200).json(lawFirms);
+        res.status(200).json(result.rows);
     } catch (error) {
         console.error('Error fetching law firms:', error);
         res.status(500).json({ message: 'Failed to fetch law firms. Please try again later.' });
@@ -222,12 +235,24 @@ router.get('/get-law-firms', authenticateToken, async (req, res) => {
     }
 });
 
-// API to fetch team members by law firm ID
 router.get('/get-team-members-by-law-firm/:lawFirmId', authenticateToken, async (req, res) => {
     const { lawFirmId } = req.params;
+
     try {
-        const teamMembers = await TeamMember.find({ createdBy: lawFirmId }, '-password').sort({ createdAt: -1 });
-        res.status(200).json(teamMembers);
+        const query = `
+            SELECT tm.*, u.law_firm_name
+            FROM team_members tm
+            JOIN users u ON tm.created_by = u.id
+            WHERE tm.created_by = $1
+            ORDER BY tm.created_at DESC;
+        `;
+        const result = await pool.query(query, [lawFirmId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'No team members found for this law firm.' });
+        }
+
+        res.status(200).json(result.rows);
     } catch (error) {
         console.error('Error fetching team members:', error);
         res.status(500).json({ message: 'Failed to fetch team members. Please try again later.' });
@@ -236,66 +261,6 @@ router.get('/get-team-members-by-law-firm/:lawFirmId', authenticateToken, async 
 
 
 
-// API to add a new case by an admin
-router.post('/add-case', authenticateToken, async (req, res) => {
-    const {
-        title,
-        startingDate,
-        caseType,
-        client,
-        oppositeClient,
-        caseWitness,
-        caseDescription,
-        documents
-    } = req.body;
-
-    if (!title || !startingDate || !caseType || !client) {
-        return res.status(400).json({ message: 'Please fill in all required fields.' });
-    }
-
-    try {
-        // Create and save new case
-        const newCase = new Case({
-            title,
-            startingDate: new Date(startingDate),
-            caseType,
-            client,
-            oppositeClient,
-            caseWitness,
-            caseDescription,
-            documents,
-            createdBy: req.user.id, // Associate the logged-in user
-        });
-
-        await newCase.save();
-        res.status(201).json({ message: 'Case added successfully', case: newCase });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to add case. Please try again later.' });
-    }
-});
-
-// API to delete a case
-router.delete('/delete-case/:id', authenticateToken, async (req, res) => {
-    const { id } = req.params;
-
-    try {
-        // Find and delete the case created by the logged-in user
-        const deletedCase = await Case.findOneAndDelete({
-            _id: id,
-            createdBy: req.user.id // Ensure the case belongs to the logged-in user
-        });
-
-        if (!deletedCase) {
-            return res.status(404).json({ message: 'Case not found or access denied.' });
-        }
-
-        res.status(200).json({ message: 'Case deleted successfully.' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to delete case. Please try again later.' });
-    }
-});
 
 
 
@@ -314,7 +279,6 @@ router.get('/get-team-members', authenticateToken, async (req, res) => {
 
 
 
-// Add a new law firm details (including personal, professional, and bank details)
 router.post('/add-law-firm-details', authenticateToken, async (req, res) => {
     const {
         lawFirmDetails,
@@ -323,15 +287,19 @@ router.post('/add-law-firm-details', authenticateToken, async (req, res) => {
     } = req.body;
 
     try {
-        // Create and save new law firm details
-        const newLawFirmDetails = new ImageForm({
+        // Validate required fields
+        if (!lawFirmDetails || !lawFirmDetails.lawFirmName || !lawFirmDetails.contactInfo || !lawFirmDetails.contactInfo.email) {
+            return res.status(400).json({ message: 'Law firm name and contact email are required.' });
+        }
+
+        // Call PostgreSQL model function
+        const newLawFirmDetails = await ImageForm.createImageForm({
             lawFirmDetails,
             professionalDetails,
             bankAccountDetails,
-            createdBy: req.user.id,
+            createdBy: req.user.id
         });
 
-        await newLawFirmDetails.save();
         res.status(201).json({ message: 'Law firm details added successfully', lawFirmDetails: newLawFirmDetails });
     } catch (error) {
         console.error(error);
@@ -340,54 +308,139 @@ router.post('/add-law-firm-details', authenticateToken, async (req, res) => {
 });
 
 // API to get law firm details
-router.get('/get-law-firm-details', authenticateToken, async (req, res) => {
+router.get('/get-all-law-firms', authenticateToken, async (req, res) => {
     try {
-        const lawFirmDetails = await ImageForm.findOne({ createdBy: req.user.id }); // Find the details created by the logged-in admin
-        
-        if (!lawFirmDetails) {
-            return res.status(404).json({ message: 'Law firm details not found' });
+        // Query PostgreSQL to get all law firms
+        const query = `
+            SELECT id, law_firm_name, operating_since, years_of_experience, specialization,
+                   email, mobile, address_line1, address_line2, city, state, postal_code,
+                   lawyer_type, case_solved_count, case_based_bill_rate, time_based_bill_rate,
+                   payment_method, card_number, expiration_date, cvv, save_card,
+                   account_number, bank_name, ifsc_code, upi_id, created_at, created_by
+            FROM image_forms
+            ORDER BY created_at DESC;
+        `;
+        const result = await pool.query(query);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'No law firms found.' });
         }
 
-        res.status(200).json(lawFirmDetails);
+        res.status(200).json(result.rows);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve law firm details. Please try again later.' });
+        console.error('Error fetching law firms:', error);
+        res.status(500).json({ message: 'Failed to fetch law firms. Please try again later.' });
     }
 });
 
-// Update law firm details
+// ✅ API to Update Law Firm Details
 router.put('/update-law-firm-details', authenticateToken, async (req, res) => {
     try {
-        const { lawFirmDetails, professionalDetails, bankAccountDetails } = req.body;
+        const { lawFirmDetails = {}, professionalDetails = {}, bankAccountDetails = {} } = req.body;
 
-        // Find and update the law firm details for the logged-in admin
-        const updatedDetails = await ImageForm.findOneAndUpdate(
-            { createdBy: req.user.id }, // Match the user ID of the logged-in admin
-            {
-                lawFirmDetails,
-                professionalDetails,
-                bankAccountDetails,
-            },
-            { new: true } // Return the updated document after modification
-        );
+        // Ensure required fields exist
+        if (!lawFirmDetails || !lawFirmDetails.lawFirmName || !lawFirmDetails.contactInfo || !lawFirmDetails.contactInfo.email) {
+            return res.status(400).json({ message: 'Law firm name and contact email are required.' });
+        }
 
-        if (!updatedDetails) {
+        // Ensure bank account details exist before accessing properties
+        bankAccountDetails.cardDetails = bankAccountDetails.cardDetails || { cardNumber: "", expirationDate: "", cvv: "", saveCard: false };
+        bankAccountDetails.bankDetails = bankAccountDetails.bankDetails || { accountNumber: "", bankName: "", ifscCode: "" };
+        bankAccountDetails.upiId = bankAccountDetails.upiId || "";
+
+        // Query to update law firm details
+        const query = `
+            UPDATE image_forms
+            SET law_firm_name = $1, operating_since = $2, years_of_experience = $3, specialization = $4,
+                email = $5, mobile = $6, address_line1 = $7, address_line2 = $8, city = $9, state = $10, postal_code = $11,
+                lawyer_type = $12, case_solved_count = $13, case_based_bill_rate = $14, time_based_bill_rate = $15,
+                payment_method = $16, card_number = $17, expiration_date = $18, cvv = $19, save_card = $20,
+                account_number = $21, bank_name = $22, ifsc_code = $23, upi_id = $24
+            WHERE created_by = $25
+            RETURNING *;
+        `;
+
+        const values = [
+            lawFirmDetails.lawFirmName, lawFirmDetails.operatingSince, lawFirmDetails.yearsOfExperience, lawFirmDetails.specialization,
+            lawFirmDetails.contactInfo.email, lawFirmDetails.contactInfo.mobile, lawFirmDetails.contactInfo.address.line1,
+            lawFirmDetails.contactInfo.address.line2, lawFirmDetails.contactInfo.address.city, lawFirmDetails.contactInfo.address.state,
+            lawFirmDetails.contactInfo.address.postalCode, professionalDetails.lawyerType, professionalDetails.caseDetails.caseSolvedCount,
+            professionalDetails.caseDetails.caseBasedBillRate, professionalDetails.caseDetails.timeBasedBillRate,
+            bankAccountDetails.paymentMethod, bankAccountDetails.cardDetails.cardNumber, bankAccountDetails.cardDetails.expirationDate,
+            bankAccountDetails.cardDetails.cvv, bankAccountDetails.cardDetails.saveCard, bankAccountDetails.bankDetails.accountNumber,
+            bankAccountDetails.bankDetails.bankName, bankAccountDetails.bankDetails.ifscCode, bankAccountDetails.upiId,
+            req.user.id // Ensures the logged-in user can only update their own law firm details
+        ];
+
+        const result = await pool.query(query, values);
+
+        if (result.rowCount === 0) {
             return res.status(404).json({ message: 'Law firm details not found' });
         }
 
-        res.status(200).json({ message: 'Law firm details updated successfully', updatedDetails });
+        res.status(200).json({ message: 'Law firm details updated successfully', updatedDetails: result.rows[0] });
     } catch (error) {
         console.error('Error updating law firm details:', error);
         res.status(500).json({ message: 'Failed to update law firm details. Please try again later.' });
     }
 });
 
+// ✅ Create a new ImageForm
+router.post('/create-image-form', authenticateToken, async (req, res) => {
+    try {
+        const newImageForm = await ImageForm.createImageForm({ ...req.body, createdBy: req.user.id });
+        res.status(201).json({ message: 'ImageForm created successfully', imageForm: newImageForm });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to create ImageForm. Please try again later.' });
+    }
+});
 
-// API to get all case details
+// ✅ Get all ImageForms created by the logged-in user
+router.get('/get-image-forms', authenticateToken, async (req, res) => {
+    try {
+        const imageForms = await ImageForm.getImageFormsByUser(req.user.id);
+        res.status(200).json(imageForms);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve ImageForms. Please try again later.' });
+    }
+});
+
+// ✅ Get ImageForm by ID
+router.get('/get-image-form/:id', authenticateToken, async (req, res) => {
+    try {
+        const imageForm = await ImageForm.getImageFormById(req.params.id);
+        if (!imageForm) {
+            return res.status(404).json({ message: 'ImageForm not found' });
+        }
+        res.status(200).json(imageForm);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve ImageForm. Please try again later.' });
+    }
+});
+
+// ✅ Delete an ImageForm
+router.delete('/delete-image-form/:id', authenticateToken, async (req, res) => {
+    try {
+        const deletedForm = await ImageForm.deleteImageForm(req.params.id, req.user.id);
+        if (!deletedForm) {
+            return res.status(404).json({ message: 'ImageForm not found or access denied.' });
+        }
+        res.status(200).json({ message: 'ImageForm deleted successfully.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to delete ImageForm. Please try again later.' });
+    }
+});
+
+// ✅ API to Get All Cases for Logged-in User
 router.get('/get-cases', authenticateToken, async (req, res) => {
     try {
-        // Retrieve cases created by the logged-in user
-        const cases = await Case.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
+        // Fetch all cases created by the logged-in user
+        const cases = await Case.getCasesByUser(req.user.id);
+
         res.status(200).json(cases);
     } catch (error) {
         console.error(error);
@@ -395,13 +448,13 @@ router.get('/get-cases', authenticateToken, async (req, res) => {
     }
 });
 
-// API to get a single case by ID
+// ✅ API to Get a Single Case by ID
 router.get('/get-case/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Find the case by its ID and ensure it belongs to the logged-in user
-        const caseDetail = await Case.findOne({ _id: id, createdBy: req.user.id });
+        // Find the case and ensure it belongs to the logged-in user
+        const caseDetail = await Case.findCaseById(id);
 
         if (!caseDetail) {
             return res.status(404).json({ message: 'Case not found or you do not have permission to view it.' });
@@ -411,11 +464,68 @@ router.get('/get-case/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
 
-        if (error.name === 'CastError') {
+        if (error.code === '22P02') { // Invalid UUID error in PostgreSQL
             return res.status(400).json({ message: 'Invalid case ID format.' });
         }
 
         res.status(500).json({ message: 'Failed to retrieve the case. Please try again later.' });
+    }
+});
+
+// ✅ API to Add a New Case
+router.post('/add-case', authenticateToken, async (req, res) => {
+    const {
+        title,
+        startingDate,
+        caseType,
+        client,
+        oppositeClient,
+        caseWitness,
+        caseDescription,
+        documents
+    } = req.body;
+
+    if (!title || !startingDate || !caseType || !client) {
+        return res.status(400).json({ message: 'Please fill in all required fields.' });
+    }
+
+    try {
+        // Create and save new case in PostgreSQL
+        const newCase = await Case.createCase({
+            title,
+            startingDate,
+            caseType,
+            client,
+            oppositeClient,
+            caseWitness,
+            caseDescription,
+            documents,
+            createdBy: req.user.id, // Associate the logged-in user
+        });
+
+        res.status(201).json({ message: 'Case added successfully', case: newCase });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to add case. Please try again later.' });
+    }
+});
+
+// ✅ API to Delete a Case
+router.delete('/delete-case/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Delete the case only if the logged-in user created it
+        const deletedCase = await Case.deleteCase(id, req.user.id);
+
+        if (!deletedCase) {
+            return res.status(404).json({ message: 'Case not found or access denied.' });
+        }
+
+        res.status(200).json({ message: 'Case deleted successfully.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to delete case. Please try again later.' });
     }
 });
 
@@ -436,8 +546,8 @@ router.post('/add-client', authenticateToken, async (req, res) => {
     }
 
     try {
-        // Create and save new client details
-        const newClient = new Client({
+        // Save new client details in PostgreSQL
+        const newClient = await Client.createClient({
             name,
             dateOfBirth,
             gender,
@@ -448,7 +558,6 @@ router.post('/add-client', authenticateToken, async (req, res) => {
             createdBy: req.user.id, // Associate the logged-in user
         });
 
-        await newClient.save();
         res.status(201).json({ message: 'Client details saved successfully', client: newClient });
     } catch (error) {
         console.error(error);
@@ -456,13 +565,12 @@ router.post('/add-client', authenticateToken, async (req, res) => {
     }
 });
 
-
 // API to get client details
 router.get('/get-client', authenticateToken, async (req, res) => {
     try {
         // Retrieve clients created by the logged-in user
-        const clients = await Client.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
-        
+        const clients = await Client.getClientsByUser(req.user.id);
+
         if (!clients || clients.length === 0) {
             return res.status(200).json([]); // Return an empty array if no clients are found
         }
@@ -474,15 +582,13 @@ router.get('/get-client', authenticateToken, async (req, res) => {
     }
 });
 
+// API to delete a client
 router.delete('/delete-client/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     try {
-        // Find and delete the client created by the logged-in user
-        const deletedClient = await Client.findOneAndDelete({
-            _id: id,
-            createdBy: req.user.id, // Ensure the client belongs to the logged-in user
-        });
+        // Ensure the client belongs to the logged-in user before deleting
+        const deletedClient = await Client.deleteClient(id, req.user.id);
 
         if (!deletedClient) {
             return res.status(404).json({ message: 'Client not found or access denied.' });
@@ -639,148 +745,148 @@ router.get('/get-hearings', authenticateToken, async (req, res) => {
     }
 });
 
-// API to add a new hearing
-router.post('/add-hearing', authenticateToken, async (req, res) => {
-    const {
-        caseId,
-        date,
-        time,
-        location,
-        judge,
-        courtRoom,
-        opposingParty,
-        witnesses,
-        documents
-    } = req.body;
+// // API to add a new hearing
+// router.post('/add-hearing', authenticateToken, async (req, res) => {
+//     const {
+//         caseId,
+//         date,
+//         time,
+//         location,
+//         judge,
+//         courtRoom,
+//         opposingParty,
+//         witnesses,
+//         documents
+//     } = req.body;
 
-    if (!caseId || !date || !time || !location) {
-        return res.status(400).json({ message: 'Missing required fields.' });
-    }
+//     if (!caseId || !date || !time || !location) {
+//         return res.status(400).json({ message: 'Missing required fields.' });
+//     }
 
-    try {
-        // Verify case existence
-        const existingCase = await Case.findById(caseId);
-        if (!existingCase) {
-            return res.status(404).json({ message: 'Case not found.' });
-        }
+//     try {
+//         // Verify case existence
+//         const existingCase = await Case.findById(caseId);
+//         if (!existingCase) {
+//             return res.status(404).json({ message: 'Case not found.' });
+//         }
 
-        // Validate time conflict
-        const startTime = new Date(`${date}T${time}`);
-        const endTime = new Date(startTime.getTime() + (60 * 60 * 1000)); // Default 1-hour duration
+//         // Validate time conflict
+//         const startTime = new Date(`${date}T${time}`);
+//         const endTime = new Date(startTime.getTime() + (60 * 60 * 1000)); // Default 1-hour duration
 
-        const conflict = await Hearing.findOne({
-            caseId,
-            date,
-            $or: [
-                { time: { $gte: time, $lt: endTime.toISOString().split('T')[1] } },
-                { endTime: { $gte: time, $lt: endTime.toISOString().split('T')[1] } }
-            ]
-        });
+//         const conflict = await Hearing.findOne({
+//             caseId,
+//             date,
+//             $or: [
+//                 { time: { $gte: time, $lt: endTime.toISOString().split('T')[1] } },
+//                 { endTime: { $gte: time, $lt: endTime.toISOString().split('T')[1] } }
+//             ]
+//         });
 
-        if (conflict) {
-            return res.status(400).json({ message: 'Hearing time conflicts with an existing schedule.' });
-        }
+//         if (conflict) {
+//             return res.status(400).json({ message: 'Hearing time conflicts with an existing schedule.' });
+//         }
 
-        const newHearing = new Hearing({
-            caseId,
-            date,
-            time,
-            location,
-            judge,
-            courtRoom,
-            opposingParty,
-            witnesses,
-            documents,
-            createdBy: req.user.id,
-            caseType: existingCase.caseType
-        });
+//         const newHearing = new Hearing({
+//             caseId,
+//             date,
+//             time,
+//             location,
+//             judge,
+//             courtRoom,
+//             opposingParty,
+//             witnesses,
+//             documents,
+//             createdBy: req.user.id,
+//             caseType: existingCase.caseType
+//         });
 
-        await newHearing.save();
-        res.status(201).json({ message: 'Hearing scheduled successfully', hearing: newHearing });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to schedule hearing.' });
-    }
-});
+//         await newHearing.save();
+//         res.status(201).json({ message: 'Hearing scheduled successfully', hearing: newHearing });
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ message: 'Failed to schedule hearing.' });
+//     }
+// });
 
-// API to get hearing details by ID
-router.get('/get-hearing/:id', authenticateToken, async (req, res) => {
-    try {
-        const hearing = await Hearing.findOne({ 
-            _id: req.params.id,
-            createdBy: req.user.id 
-        })
-        .populate('client', 'name')
-        .populate('caseId', 'title caseType');
+// // API to get hearing details by ID
+// router.get('/get-hearing/:id', authenticateToken, async (req, res) => {
+//     try {
+//         const hearing = await Hearing.findOne({ 
+//             _id: req.params.id,
+//             createdBy: req.user.id 
+//         })
+//         .populate('client', 'name')
+//         .populate('caseId', 'title caseType');
 
-        if (!hearing) {
-            return res.status(404).json({ message: 'Hearing not found.' });
-        }
+//         if (!hearing) {
+//             return res.status(404).json({ message: 'Hearing not found.' });
+//         }
 
-        res.status(200).json(hearing);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve hearing details.' });
-    }
-});
+//         res.status(200).json(hearing);
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ message: 'Failed to retrieve hearing details.' });
+//     }
+// });
 
-// API to update hearing details
-router.put('/update-hearing/:id', authenticateToken, async (req, res) => {
-    try {
-        const updatedHearing = await Hearing.findOneAndUpdate(
-            { _id: req.params.id, createdBy: req.user.id },
-            { 
-                $set: {
-                    ...req.body,
-                    updatedAt: new Date()
-                }
-            },
-            { new: true }
-        );
+// // API to update hearing details
+// router.put('/update-hearing/:id', authenticateToken, async (req, res) => {
+//     try {
+//         const updatedHearing = await Hearing.findOneAndUpdate(
+//             { _id: req.params.id, createdBy: req.user.id },
+//             { 
+//                 $set: {
+//                     ...req.body,
+//                     updatedAt: new Date()
+//                 }
+//             },
+//             { new: true }
+//         );
 
-        if (!updatedHearing) {
-            return res.status(404).json({ message: 'Hearing not found.' });
-        }
+//         if (!updatedHearing) {
+//             return res.status(404).json({ message: 'Hearing not found.' });
+//         }
 
-        res.status(200).json({ message: 'Hearing updated successfully', hearing: updatedHearing });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to update hearing.' });
-    }
-});
+//         res.status(200).json({ message: 'Hearing updated successfully', hearing: updatedHearing });
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ message: 'Failed to update hearing.' });
+//     }
+// });
 
-// API to delete hearing
-router.delete('/delete-hearing/:id', authenticateToken, async (req, res) => {
-    try {
-        const deletedHearing = await Hearing.findOneAndDelete({
-            _id: req.params.id,
-            createdBy: req.user.id
-        });
+// // API to delete hearing
+// router.delete('/delete-hearing/:id', authenticateToken, async (req, res) => {
+//     try {
+//         const deletedHearing = await Hearing.findOneAndDelete({
+//             _id: req.params.id,
+//             createdBy: req.user.id
+//         });
 
-        if (!deletedHearing) {
-            return res.status(404).json({ message: 'Hearing not found.' });
-        }
+//         if (!deletedHearing) {
+//             return res.status(404).json({ message: 'Hearing not found.' });
+//         }
 
-        res.status(200).json({ message: 'Hearing deleted successfully' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to delete hearing.' });
-    }
-});
+//         res.status(200).json({ message: 'Hearing deleted successfully' });
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ message: 'Failed to delete hearing.' });
+//     }
+// });
 
-// API to get upcoming hearings
-router.get('/get-upcoming-hearings', authenticateToken, async (req, res) => {
-    try {
-        const upcomingHearings = await Hearing.findUpcoming(req.user.id)
-            .populate('client', 'name')
-            .populate('caseId', 'title caseType');
+// // API to get upcoming hearings
+// router.get('/get-upcoming-hearings', authenticateToken, async (req, res) => {
+//     try {
+//         const upcomingHearings = await Hearing.findUpcoming(req.user.id)
+//             .populate('client', 'name')
+//             .populate('caseId', 'title caseType');
         
-        res.status(200).json(upcomingHearings);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve upcoming hearings.' });
-    }
-});
+//         res.status(200).json(upcomingHearings);
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ message: 'Failed to retrieve upcoming hearings.' });
+//     }
+// });
 
 // Update timer for a case
 router.put('/update-case-timer/:id', authenticateToken, async (req, res) => {
@@ -810,5 +916,130 @@ router.put('/update-case-timer/:id', authenticateToken, async (req, res) => {
 });
 
 
+// ✅ Create a new appointment
+router.post('/create-appointment', authenticateToken, async (req, res) => {
+    try {
+        const newAppointment = await Appointment.createAppointment(req.body);
+        res.status(201).json({ message: 'Appointment created successfully', appointment: newAppointment });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to create appointment. Please try again later.' });
+    }
+});
+
+// ✅ Get appointment by ID
+router.get('/get-appointment/:id', authenticateToken, async (req, res) => {
+    try {
+        const appointment = await Appointment.getAppointmentById(req.params.id);
+        if (!appointment) {
+            return res.status(404).json({ message: 'Appointment not found' });
+        }
+        res.status(200).json(appointment);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve appointment. Please try again later.' });
+    }
+});
+
+// ✅ Get all appointments for a lawyer
+router.get('/get-appointments-lawyer/:lawyerId', authenticateToken, async (req, res) => {
+    try {
+        const appointments = await Appointment.getAppointmentsByLawyer(req.params.lawyerId);
+        res.status(200).json(appointments);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve appointments. Please try again later.' });
+    }
+});
+
+// ✅ Get all appointments for a client
+router.get('/get-appointments-client/:clientId', authenticateToken, async (req, res) => {
+    try {
+        const appointments = await Appointment.getAppointmentsByClient(req.params.clientId);
+        res.status(200).json(appointments);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve appointments. Please try again later.' });
+    }
+});
+
+// ✅ Update appointment status
+router.put('/update-appointment-status/:id', authenticateToken, async (req, res) => {
+    try {
+        const updatedAppointment = await Appointment.updateAppointmentStatus(req.params.id, req.body.status);
+        res.status(200).json({ message: 'Appointment status updated successfully', updatedAppointment });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to update appointment status. Please try again later.' });
+    }
+});
+
+// ✅ Delete an appointment
+router.delete('/delete-appointment/:id', authenticateToken, async (req, res) => {
+    try {
+        const deletedAppointment = await Appointment.deleteAppointment(req.params.id);
+        if (!deletedAppointment) {
+            return res.status(404).json({ message: 'Appointment not found' });
+        }
+        res.status(200).json({ message: 'Appointment deleted successfully.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to delete appointment. Please try again later.' });
+    }
+});
+
+// ✅ Create a new hearing schedule
+router.post('/create-hearing', authenticateToken, async (req, res) => {
+    try {
+        const newHearingSchedule = await HearingSchedule.createHearingSchedule(req.body);
+        res.status(201).json({ message: 'Hearing schedule created successfully', hearingSchedule: newHearingSchedule });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to create hearing schedule. Please try again later.' });
+    }
+});
+
+// ✅ Get hearing schedule by ID
+router.get('/get-hearing/:id', authenticateToken, async (req, res) => {
+    try {
+        const hearingSchedule = await HearingSchedule.getHearingScheduleById(req.params.id);
+        if (!hearingSchedule) {
+            return res.status(404).json({ message: 'Hearing schedule not found' });
+        }
+        res.status(200).json(hearingSchedule);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve hearing schedule. Please try again later.' });
+    }
+});
+
+// ✅ Get all hearing schedules for a user
+router.get('/get-hearings-user/:userId', authenticateToken, async (req, res) => {
+    try {
+        const hearingSchedules = await HearingSchedule.getHearingSchedulesByUser(req.params.userId);
+        res.status(200).json(hearingSchedules);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve hearing schedules. Please try again later.' });
+    }
+});
+
+// ✅ Delete a hearing schedule
+router.delete('/delete-hearing/:id', authenticateToken, async (req, res) => {
+    try {
+        const deletedHearingSchedule = await HearingSchedule.deleteHearingSchedule(req.params.id);
+        if (!deletedHearingSchedule) {
+            return res.status(404).json({ message: 'Hearing schedule not found' });
+        }
+        res.status(200).json({ message: 'Hearing schedule deleted successfully.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to delete hearing schedule. Please try again later.' });
+    }
+});
+
 
 module.exports = router;
+
+
+

@@ -18,15 +18,10 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'Passwords do not match' });
         }
 
-<<<<<<< HEAD
         // Check if email already exists
         const emailExistsQuery = 'SELECT * FROM users WHERE email = $1';
         const existingUser = await pool.query(emailExistsQuery, [email]);
         if (existingUser.rows.length > 0) {
-=======
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
->>>>>>> b2057cec0be2781521f881347ce1652564d94ca1
             return res.status(400).json({ message: 'Email or Username is already registered' });
         }
 
@@ -38,7 +33,6 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'Company name is required for corporates' });
         }
 
-<<<<<<< HEAD
         // Hash the password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -58,64 +52,6 @@ router.post('/register', async (req, res) => {
         ];
         const result = await pool.query(insertUserQuery, values);
         const newUser = result.rows[0];
-=======
-        const newUser = new User({
-            role,
-            username,
-            email,
-            password,
-            law_firm_name: role === 'law_firm' ? law_firm_name : undefined,
-            company_name: role === 'corporate' ? company_name : undefined,
-        });
-
-        await newUser.save();
-
-        if (role === 'law_firm') {
-            const teamMember = new TeamMember({
-                personalDetails: {
-                    name: username,
-                    email: email,
-                    mobile: '',
-                    gender: '',
-                    yearsOfExperience: 0,
-                    address: {
-                        line1: '',
-                        line2: '',
-                        city: '',
-                        state: '',
-                        country: '',
-                        postalCode: '',
-                    }
-                },
-                professionalDetails: {
-                    lawyerType: 'Owner',
-                    governmentID: '',
-                    degreeType: '',
-                    degreeInstitution: '',
-                    specialization: '',
-                },
-                bankAccountDetails: {
-                    paymentMethod: 'Card',
-                    cardDetails: {
-                        cardNumber: '',
-                        expirationDate: '',
-                        cvv: '',
-                        saveCard: false,
-                    },
-                    bankDetails: {
-                        accountNumber: '',
-                        bankName: '',
-                        ifscCode: '',
-                    },
-                    upiId: '',
-                },
-                password: password,
-                createdBy: newUser._id
-            });
-
-            await teamMember.save();
-        }
->>>>>>> b2057cec0be2781521f881347ce1652564d94ca1
 
         const token = jwt.sign(
             { id: newUser.id, role: newUser.role },
