@@ -13,6 +13,8 @@ const UserSchema = new mongoose.Schema({
     company_name: { type: String }, // Required for corporate
     law_firm_name: { type: String }, // Required for law firm
     validated: { type: Boolean, default: true }, // Admin validation for all users
+    status: { type: String, enum: ['active', 'suspended'], default: 'active' }, // User status
+    suspensionReason: { type: String }, // Reason for suspension
 }, { timestamps: true });
 
 // Hash password before saving
