@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const TeamMember = require('../models/TeamMember');
-const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 
 // Register a new user (Citizen, Law Firm, Corporate)
@@ -111,8 +111,7 @@ router.post('/register', async (req, res) => {
     }
 });
 
-
-//login
+// Login
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -160,8 +159,6 @@ router.post('/login', async (req, res) => {
     }
 });
 
-
-
 // Fetch User Profile (Shared for all roles)
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
@@ -192,26 +189,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-
-//Admin validates the user (future)
-router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req, res) => {
-    try {
-        const user = await User.findById(req.params.id);
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        user.validated = true;
-        await user.save();
-        res.json({ message: `${user.role} validated successfully` });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to validate user. Please try again later.' });
-    }
-});
-
-
-//signout
+// Signout
 router.post('/signout', authenticateToken, async (req, res) => {
     try {
         res.status(200).json({ message: 'Signed out successfully' });
