@@ -59,4 +59,47 @@ router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req
     }
 });
 
+
+// Create new user
+router.post('/users', authenticateToken, authorizeAdmin, async (req, res) => {
+    const { email, name, role, firmId } = req.body;
+
+    try {
+        if (!email || !name || !role) {
+            return res.status(400).json({ message: 'Email, name, and role are required' });
+        }
+
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ message: 'Email is already registered' });
+        }
+
+        const newUser = new User({
+            email,
+            username: name,
+            role,
+            law_firm_name: role === 'lawFirm' ? firmId : undefined,
+            company_name: role === 'corporate' ? firmId : undefined,
+            password: 'defaultPassword123' // Set a default password or generate one
+        });
+
+        await newUser.save();
+
+        res.status(201).json({ 
+            message: 'User created successfully',
+            user: {
+                id: newUser._id,
+                email: newUser.email,
+                name: newUser.username,
+                role: newUser.role,
+                firmId: newUser.law_firm_name || newUser.company_name
+            }
+        });
+    } catch (error) {
+        console.error('Error creating user:', error);
+        res.status(500).json({ message: 'Failed to create user. Please try again later.' });
+    }
+});
+
+
 module.exports = router;
