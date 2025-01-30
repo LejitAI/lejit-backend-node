@@ -178,4 +178,36 @@ router.post('/users', authenticateToken, authorizeAdmin, async (req, res) => {
 });
 
 
+// Update user status
+router.patch('/users/:userId', authenticateToken, authorizeAdmin, async (req, res) => {
+    const { userId } = req.params;
+    const { status, reason } = req.body;
+
+    try {
+        if (!status || !['active', 'suspended'].includes(status)) {
+            return res.status(400).json({ message: 'Invalid status' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        user.status = status;
+        if (status === 'suspended' && reason) {
+            user.suspensionReason = reason;
+        } else {
+            user.suspensionReason = undefined;
+        }
+
+        await user.save();
+
+        res.status(200).json({ message: `User status updated to ${status}` });
+    } catch (error) {
+        console.error('Error updating user status:', error);
+        res.status(500).json({ message: 'Failed to update user status. Please try again later.' });
+    }
+});
+
+
 module.exports = router;
