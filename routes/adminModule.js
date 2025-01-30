@@ -64,7 +64,7 @@ router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req
 
 
 
-// Create new user
+// Create new user (Admin only)
 router.post('/users', authenticateToken, authorizeAdmin, async (req, res) => {
     const { role, username, email, password, confirmPassword, law_firm_name, company_name } = req.body;
 
@@ -176,7 +176,6 @@ router.post('/users', authenticateToken, authorizeAdmin, async (req, res) => {
         res.status(500).json({ message: 'Failed to create user. Please try again later.' });
     }
 });
-
 
 
 module.exports = router;
