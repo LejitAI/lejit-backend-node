@@ -230,4 +230,91 @@ router.delete('/users/:userId', authenticateToken, authorizeAdmin, async (req, r
 });
 
 
+
+// Add users to law firm
+router.post('/law-firms/:firmId/users', authenticateToken, authorizeAdmin, async (req, res) => {
+    const { firmId } = req.params;
+    const { userIds } = req.body;
+
+    try {
+        const lawFirm = await LawFirm.findById(firmId);
+        if (!lawFirm) {
+            return res.status(404).json({ message: 'Law firm not found' });
+        }
+
+        const users = await User.find({ _id: { $in: userIds } });
+        if (users.length !== userIds.length) {
+            return res.status(400).json({ message: 'Some users not found' });
+        }
+
+        const teamMembers = users.map(user => ({
+            personalDetails: {
+                name: user.username,
+                email: user.email,
+                mobile: '',
+                gender: '',
+                yearsOfExperience: 0,
+                address: {
+                    line1: '',
+                    line2: '',
+                    city: '',
+                    state: '',
+                    country: '',
+                    postalCode: '',
+                }
+            },
+            professionalDetails: {
+                lawyerType: 'Member',
+                governmentID: '',
+                degreeType: '',
+                degreeInstitution: '',
+                specialization: '',
+            },
+            bankAccountDetails: {
+                paymentMethod: 'Card',
+                cardDetails: {
+                    cardNumber: '',
+                    expirationDate: '',
+                    cvv: '',
+                    saveCard: false,
+                },
+                bankDetails: {
+                    accountNumber: '',
+                    bankName: '',
+                    ifscCode: '',
+                },
+                upiId: '',
+            },
+            password: user.password,
+            createdBy: user._id
+        }));
+
+        await TeamMember.insertMany(teamMembers);
+
+        res.status(201).json({ message: 'Users added to law firm successfully' });
+    } catch (error) {
+        console.error('Error adding users to law firm:', error);
+        res.status(500).json({ message: 'Failed to add users to law firm. Please try again later.' });
+    }
+});
+
+// Get law firm details
+router.get('/law-firms/:firmId', authenticateToken, authorizeAdmin, async (req, res) => {
+    const { firmId } = req.params;
+
+    try {
+        const lawFirm = await LawFirm.findById(firmId).populate('createdBy', 'username email');
+        if (!lawFirm) {
+            return res.status(404).json({ message: 'Law firm not found' });
+        }
+
+        res.status(200).json(lawFirm);
+    } catch (error) {
+        console.error('Error fetching law firm details:', error);
+        res.status(500).json({ message: 'Failed to fetch law firm details. Please try again later.' });
+    }
+});
+
+
+
 module.exports = router;
