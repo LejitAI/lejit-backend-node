@@ -209,6 +209,8 @@ router.patch('/users/:userId', authenticateToken, authorizeAdmin, async (req, re
     }
 });
 
+//delete user
+
 router.delete('/users/:userId', authenticateToken, authorizeAdmin, async (req, res) => {
     const { userId } = req.params;
 
