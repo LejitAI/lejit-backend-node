@@ -1,8 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const User = require('../models/User');
-const TeamMember = require('../models/TeamMember');
+const { pool } = require('../config/db'); // PostgreSQL connection
 const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
 const router = express.Router();
 
@@ -22,8 +21,9 @@ router.post('/register', async (req, res) => {
         }
 
         // Check if email already exists
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
+        const emailExistsQuery = 'SELECT * FROM users WHERE email = $1';
+        const existingUser = await pool.query(emailExistsQuery, [email]);
+        if (existingUser.rows.length > 0) {
             return res.status(400).json({ message: 'Email or Username is already registered' });
         }
 
@@ -36,81 +36,42 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'Company name is required for corporates' });
         }
 
-        // Create and save new user
-        const newUser = new User({
+        // Hash the password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // Insert the new user into the database
+        const insertUserQuery = `
+            INSERT INTO users (role, username, email, password, law_firm_name, company_name)
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+        `;
+        const values = [
             role,
             username,
             email,
-            password,
-            law_firm_name: role === 'law_firm' ? law_firm_name : undefined,
-            company_name: role === 'corporate' ? company_name : undefined,
-        });
-
-        await newUser.save();
-
-        // If it's a law firm user, create a team member entry
-        if (role === 'law_firm') {
-            const teamMember = new TeamMember({
-                personalDetails: {
-                    name: username,
-                    email: email,
-                    mobile: '',
-                    gender: '',
-                    yearsOfExperience: 0,
-                    address: {
-                        line1: '',
-                        line2: '',
-                        city: '',
-                        state: '',
-                        country: '',
-                        postalCode: '',
-                    }
-                },
-                professionalDetails: {
-                    lawyerType: 'Owner',
-                    governmentID: '',
-                    degreeType: '',
-                    degreeInstitution: '',
-                    specialization: '',
-                },
-                bankAccountDetails: {
-                    paymentMethod: 'Card',
-                    cardDetails: {
-                        cardNumber: '',
-                        expirationDate: '',
-                        cvv: '',
-                        saveCard: false,
-                    },
-                    bankDetails: {
-                        accountNumber: '',
-                        bankName: '',
-                        ifscCode: '',
-                    },
-                    upiId: '',
-                },
-                password: password,
-                createdBy: newUser._id
-            });
-
-            await teamMember.save();
-        }
+            hashedPassword,
+            role === 'law_firm' ? law_firm_name : null,
+            role === 'corporate' ? company_name : null,
+        ];
+        const result = await pool.query(insertUserQuery, values);
+        const newUser = result.rows[0];
 
         // Generate token without expiration
         const token = jwt.sign(
-            { id: newUser._id, role: newUser.role },
+            { id: newUser.id, role: newUser.role },
             process.env.JWT_SECRET
         );
 
-        res.status(201).json({ 
+        res.status(201).json({
             message: `${role} registered successfully`,
             token,
             user: {
-                id: newUser._id,
+                id: newUser.id,
                 username: newUser.username,
                 email: newUser.email,
                 role: newUser.role,
-                law_firm_name: newUser.law_firm_name
-            }
+                law_firm_name: newUser.law_firm_name,
+            },
         });
     } catch (error) {
         console.error(error);
@@ -129,40 +90,35 @@ router.post('/login', async (req, res) => {
         }
 
         // Check if user exists
-        const user = await User.findOne({ email });
+        const findUserQuery = 'SELECT * FROM users WHERE email = $1';
+        const userResult = await pool.query(findUserQuery, [email]);
+        const user = userResult.rows[0];
+
         if (!user) {
             return res.status(401).json({ message: 'User not found. Please register first.' });
         }
 
         // Validate password
-        if (!(await user.matchPassword(password))) {
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
             return res.status(401).json({ message: 'Incorrect password' });
         }
 
-        // Generate token without expiration
+        // Generate token
         const token = jwt.sign(
-            { id: user._id, role: user.role },
+            { id: user.id, role: user.role },
             process.env.JWT_SECRET
         );
-        
-        // Get team member details if it's a law firm
-        let teamMemberDetails = null;
-        if (user.role === 'law_firm') {
-            teamMemberDetails = await TeamMember.findOne({ 'personalDetails.email': email })
-                .select('-password');
-        }
 
-        res.json({ 
-            token, 
-            role: user.role,
+        res.json({
+            token,
             user: {
-                id: user._id,
+                id: user.id,
                 username: user.username,
                 email: user.email,
                 role: user.role,
-                law_firm_name: user.law_firm_name,
-                teamMemberDetails: teamMemberDetails
-            }
+                law_firm_name: user.law_firm_name || null,
+            },
         });
     } catch (error) {
         console.error(error);
@@ -174,48 +130,33 @@ router.post('/login', async (req, res) => {
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
         // Fetch user by ID
-        const user = await User.findById(req.user.id).select('-password');
+        const findUserQuery = 'SELECT id, username, email, role, law_firm_name, company_name FROM users WHERE id = $1';
+        const userResult = await pool.query(findUserQuery, [req.user.id]);
+        const user = userResult.rows[0];
+
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Fetch additional details for law firms
-        let teamMemberDetails = null;
-        if (user.role === 'law_firm') {
-            teamMemberDetails = await TeamMember.findOne({ createdBy: user._id })
-                .select('-password');
-        }
-
-        // Return user profile
-        res.json({
-            user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
-                role: user.role,
-                law_firm_name: user.law_firm_name || null,
-                teamMemberDetails: teamMemberDetails || null,
-            },
-        });
+        res.json({ user });
     } catch (error) {
         console.error('Error fetching profile:', error);
         res.status(500).json({ message: 'Failed to fetch user profile' });
     }
 });
 
-
-// (Optional) Admin validates the user (if needed in the future)
+// Admin validates the user
 router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req, res) => {
     try {
-        // Find user by ID
-        const user = await User.findById(req.params.id);
-        if (!user) {
+        // Update the validation status of a user
+        const validateUserQuery = 'UPDATE users SET validated = true WHERE id = $1 RETURNING *';
+        const result = await pool.query(validateUserQuery, [req.params.id]);
+
+        if (result.rowCount === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Update validation status
-        user.validated = true;
-        await user.save();
+        const user = result.rows[0];
         res.json({ message: `${user.role} validated successfully` });
     } catch (error) {
         console.error(error);
@@ -223,10 +164,10 @@ router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req
     }
 });
 
-// Add this new route to your existing auth.js
+// Sign out route (optional for token blacklisting)
 router.post('/signout', authenticateToken, async (req, res) => {
     try {
-        // You could implement a token blacklist here if needed
+        // Implement token blacklisting here if needed
         res.status(200).json({ message: 'Signed out successfully' });
     } catch (error) {
         console.error(error);

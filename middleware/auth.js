@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { pool } = require('../config/db'); // Import PostgreSQL connection
 
 // Middleware to authenticate token
 const authenticateToken = async (req, res, next) => {
@@ -9,14 +9,18 @@ const authenticateToken = async (req, res, next) => {
     if (!token) return res.sendStatus(401); // Unauthorized
 
     try {
+        // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findById(decoded.id);
 
+        // Fetch user from PostgreSQL database
+        const query = 'SELECT id, username, email, role FROM users WHERE id = $1';
+        const result = await pool.query(query, [decoded.id]);
+
+        // Check if user exists
+        const user = result.rows[0];
         if (!user) return res.status(404).json({ message: 'User not found' });
-        
-        // Comment out the validation check below
-        // if (!user.validated) return res.status(403).json({ message: 'User is not validated by admin' });
 
+        // Attach user to the request object
         req.user = user;
         next();
     } catch (error) {
