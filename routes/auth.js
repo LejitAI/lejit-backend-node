@@ -10,24 +10,26 @@ router.post('/register', async (req, res) => {
     const { role, username, email, password, confirmPassword, law_firm_name, company_name } = req.body;
 
     try {
-        // Validate required fields
         if (!role || !username || !email || !password || !confirmPassword) {
             return res.status(400).json({ message: 'All fields are required' });
         }
 
-        // Ensure passwords match
         if (password !== confirmPassword) {
             return res.status(400).json({ message: 'Passwords do not match' });
         }
 
+<<<<<<< HEAD
         // Check if email already exists
         const emailExistsQuery = 'SELECT * FROM users WHERE email = $1';
         const existingUser = await pool.query(emailExistsQuery, [email]);
         if (existingUser.rows.length > 0) {
+=======
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+>>>>>>> b2057cec0be2781521f881347ce1652564d94ca1
             return res.status(400).json({ message: 'Email or Username is already registered' });
         }
 
-        // Additional role-specific validations
         if (role === 'law_firm' && !law_firm_name) {
             return res.status(400).json({ message: 'Law firm name is required for law firms' });
         }
@@ -36,6 +38,7 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'Company name is required for corporates' });
         }
 
+<<<<<<< HEAD
         // Hash the password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -55,8 +58,65 @@ router.post('/register', async (req, res) => {
         ];
         const result = await pool.query(insertUserQuery, values);
         const newUser = result.rows[0];
+=======
+        const newUser = new User({
+            role,
+            username,
+            email,
+            password,
+            law_firm_name: role === 'law_firm' ? law_firm_name : undefined,
+            company_name: role === 'corporate' ? company_name : undefined,
+        });
 
-        // Generate token without expiration
+        await newUser.save();
+
+        if (role === 'law_firm') {
+            const teamMember = new TeamMember({
+                personalDetails: {
+                    name: username,
+                    email: email,
+                    mobile: '',
+                    gender: '',
+                    yearsOfExperience: 0,
+                    address: {
+                        line1: '',
+                        line2: '',
+                        city: '',
+                        state: '',
+                        country: '',
+                        postalCode: '',
+                    }
+                },
+                professionalDetails: {
+                    lawyerType: 'Owner',
+                    governmentID: '',
+                    degreeType: '',
+                    degreeInstitution: '',
+                    specialization: '',
+                },
+                bankAccountDetails: {
+                    paymentMethod: 'Card',
+                    cardDetails: {
+                        cardNumber: '',
+                        expirationDate: '',
+                        cvv: '',
+                        saveCard: false,
+                    },
+                    bankDetails: {
+                        accountNumber: '',
+                        bankName: '',
+                        ifscCode: '',
+                    },
+                    upiId: '',
+                },
+                password: password,
+                createdBy: newUser._id
+            });
+
+            await teamMember.save();
+        }
+>>>>>>> b2057cec0be2781521f881347ce1652564d94ca1
+
         const token = jwt.sign(
             { id: newUser.id, role: newUser.role },
             process.env.JWT_SECRET
@@ -79,12 +139,12 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// Login (Shared for all roles)
+
+//login
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        // Validate required fields
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required' });
         }
@@ -125,6 +185,8 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ message: 'Failed to log in. Please try again later.' });
     }
 });
+
+
 
 // Fetch User Profile (Shared for all roles)
 router.get('/profile', authenticateToken, async (req, res) => {
