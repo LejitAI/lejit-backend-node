@@ -2,6 +2,9 @@ const express = require('express');
 const User = require('../models/User');
 const TeamMember = require('../models/TeamMember');
 const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const LawFirm = require('../models/LawFirm'); // Ensure you have this model
 const router = express.Router();
 
 // Get all users with pagination and filters
@@ -60,39 +63,112 @@ router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req
 });
 
 
+
 // Create new user
 router.post('/users', authenticateToken, authorizeAdmin, async (req, res) => {
-    const { email, name, role, firmId } = req.body;
+    const { role, username, email, password, confirmPassword, law_firm_name, company_name } = req.body;
 
     try {
-        if (!email || !name || !role) {
-            return res.status(400).json({ message: 'Email, name, and role are required' });
+        if (!role || !username || !email || !password || !confirmPassword) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+
+        if (password !== confirmPassword) {
+            return res.status(400).json({ message: 'Passwords do not match' });
         }
 
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ message: 'Email is already registered' });
+            return res.status(400).json({ message: 'Email or Username is already registered' });
+        }
+
+        if (role === 'law_firm' && !law_firm_name) {
+            return res.status(400).json({ message: 'Law firm name is required for law firms' });
+        }
+
+        if (role === 'corporate' && !company_name) {
+            return res.status(400).json({ message: 'Company name is required for corporates' });
         }
 
         const newUser = new User({
-            email,
-            username: name,
             role,
-            law_firm_name: role === 'lawFirm' ? firmId : undefined,
-            company_name: role === 'corporate' ? firmId : undefined,
-            password: 'defaultPassword123' // Set a default password or generate one
+            username,
+            email,
+            password,
+            law_firm_name: role === 'law_firm' ? law_firm_name : undefined,
+            company_name: role === 'corporate' ? company_name : undefined,
         });
 
         await newUser.save();
 
+        if (role === 'law_firm') {
+            // Save law firm name to LawFirm database
+            const newLawFirm = new LawFirm({
+                name: law_firm_name,
+                createdBy: newUser._id
+            });
+            await newLawFirm.save();
+
+            // Save user details to TeamMember database
+            const teamMember = new TeamMember({
+                personalDetails: {
+                    name: username,
+                    email: email,
+                    mobile: '',
+                    gender: '',
+                    yearsOfExperience: 0,
+                    address: {
+                        line1: '',
+                        line2: '',
+                        city: '',
+                        state: '',
+                        country: '',
+                        postalCode: '',
+                    }
+                },
+                professionalDetails: {
+                    lawyerType: 'Owner',
+                    governmentID: '',
+                    degreeType: '',
+                    degreeInstitution: '',
+                    specialization: '',
+                },
+                bankAccountDetails: {
+                    paymentMethod: 'Card',
+                    cardDetails: {
+                        cardNumber: '',
+                        expirationDate: '',
+                        cvv: '',
+                        saveCard: false,
+                    },
+                    bankDetails: {
+                        accountNumber: '',
+                        bankName: '',
+                        ifscCode: '',
+                    },
+                    upiId: '',
+                },
+                password: password,
+                createdBy: newUser._id
+            });
+
+            await teamMember.save();
+        }
+
+        const token = jwt.sign(
+            { id: newUser._id, role: newUser.role },
+            process.env.JWT_SECRET
+        );
+
         res.status(201).json({ 
-            message: 'User created successfully',
+            message: `${role} created successfully`,
+            token,
             user: {
                 id: newUser._id,
+                username: newUser.username,
                 email: newUser.email,
-                name: newUser.username,
                 role: newUser.role,
-                firmId: newUser.law_firm_name || newUser.company_name
+                law_firm_name: newUser.law_firm_name
             }
         });
     } catch (error) {
@@ -100,6 +176,7 @@ router.post('/users', authenticateToken, authorizeAdmin, async (req, res) => {
         res.status(500).json({ message: 'Failed to create user. Please try again later.' });
     }
 });
+
 
 
 module.exports = router;
