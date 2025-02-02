@@ -265,6 +265,7 @@ router.post('/add-case', authenticateToken, async (req, res) => {
             caseDescription,
             documents,
             createdBy: req.user.id, // Associate the logged-in user
+            startTime: new Date(), // Set the start time to the current time
         });
 
         await newCase.save();
@@ -274,7 +275,6 @@ router.post('/add-case', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Failed to add case. Please try again later.' });
     }
 });
-
 // API to delete a case
 router.delete('/delete-case/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
