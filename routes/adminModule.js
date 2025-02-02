@@ -69,47 +69,54 @@ router.post('/users', authenticateToken, authorizeAdmin, async (req, res) => {
     const { role, username, email, password, confirmPassword, law_firm_name, company_name } = req.body;
 
     try {
+        // Validate required fields
         if (!role || !username || !email || !password || !confirmPassword) {
             return res.status(400).json({ message: 'All fields are required' });
         }
 
+        // Validate password match
         if (password !== confirmPassword) {
             return res.status(400).json({ message: 'Passwords do not match' });
         }
 
+        // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: 'Email or Username is already registered' });
         }
 
+        // Validate role-specific fields
         if (role === 'law_firm' && !law_firm_name) {
             return res.status(400).json({ message: 'Law firm name is required for law firms' });
         }
-
         if (role === 'corporate' && !company_name) {
             return res.status(400).json({ message: 'Company name is required for corporates' });
         }
 
+        // Hash the password before saving
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // Create new user
         const newUser = new User({
             role,
             username,
             email,
-            password,
+            password: hashedPassword, // Store hashed password
             law_firm_name: role === 'law_firm' ? law_firm_name : undefined,
             company_name: role === 'corporate' ? company_name : undefined,
         });
 
         await newUser.save();
 
+        // If the user is a law firm owner, create law firm and team member records
         if (role === 'law_firm') {
-            // Save law firm name to LawFirm database
             const newLawFirm = new LawFirm({
                 name: law_firm_name,
                 createdBy: newUser._id
             });
             await newLawFirm.save();
 
-            // Save user details to TeamMember database
             const teamMember = new TeamMember({
                 personalDetails: {
                     name: username,
@@ -148,19 +155,21 @@ router.post('/users', authenticateToken, authorizeAdmin, async (req, res) => {
                     },
                     upiId: '',
                 },
-                password: password,
+                password: hashedPassword, // Store hashed password
                 createdBy: newUser._id
             });
 
             await teamMember.save();
         }
 
+        // Generate JWT token for the new user
         const token = jwt.sign(
             { id: newUser._id, role: newUser.role },
-            process.env.JWT_SECRET
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
         );
 
-        res.status(201).json({ 
+        res.status(201).json({
             message: `${role} created successfully`,
             token,
             user: {
@@ -168,7 +177,8 @@ router.post('/users', authenticateToken, authorizeAdmin, async (req, res) => {
                 username: newUser.username,
                 email: newUser.email,
                 role: newUser.role,
-                law_firm_name: newUser.law_firm_name
+                law_firm_name: newUser.law_firm_name,
+                company_name: newUser.company_name
             }
         });
     } catch (error) {
