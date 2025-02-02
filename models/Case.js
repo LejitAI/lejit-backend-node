@@ -13,6 +13,7 @@ const CaseSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     timer: { type: Number, default: 0 }, // Timer in seconds
     isRunning: { type: Boolean, default: true }, // Timer running state
+    startTime: { type: Date, default: Date.now }, // Start time of the timer
 });
 
 module.exports = mongoose.model('Case', CaseSchema);
