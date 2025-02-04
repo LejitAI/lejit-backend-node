@@ -129,6 +129,41 @@ router.get('/documents', authenticateToken, (req, res) => {
     }
 });
 
+// Document deletion endpoint
+router.delete('/documents', authenticateToken, (req, res) => {
+    const { caseId, fileName } = req.query;
+
+    if (!caseId || !fileName) {
+        return res.status(400).json({ message: 'Both caseId and fileName are required.' });
+    }
+
+    const filePath = path.join('uploads', caseId.toString(), fileName);
+
+    try {
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ message: 'File not found.' });
+        }
+
+        // Delete the file
+        fs.unlinkSync(filePath);
+
+        // Optionally, you can also remove the tags associated with the file if needed
+        // For example, if you want to remove tags when the last file is deleted:
+        const caseDirectory = path.join('uploads', caseId.toString());
+        const remainingFiles = fs.readdirSync(caseDirectory);
+
+        if (remainingFiles.length === 0) {
+            delete caseTags[caseId];
+            saveTags(caseTags);
+        }
+
+        res.status(200).json({ message: 'File deleted successfully!', caseId: caseId, fileName: fileName });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error occurred while deleting the file.' });
+    }
+});
+
 router.get('/get-case-arguments', authenticateToken, async (req, res) => {
     const { caseId } = req.query;
 
