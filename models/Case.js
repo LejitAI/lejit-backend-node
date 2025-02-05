@@ -14,6 +14,7 @@ const CaseSchema = new mongoose.Schema({
     timer: { type: Number, default: 0 }, // Timer in seconds
     isRunning: { type: Boolean, default: true }, // Timer running state
     startTime: { type: Date, default: Date.now }, // Start time of the timer
+    status: { type: String, enum: ['ongoing', 'closed'], default: 'ongoing' } // Status of the case
 });
 
 module.exports = mongoose.model('Case', CaseSchema);
