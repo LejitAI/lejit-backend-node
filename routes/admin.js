@@ -810,5 +810,43 @@ router.put('/update-case-timer/:id', authenticateToken, async (req, res) => {
 });
 
 
+router.get('/case-status-count', authenticateToken, async (req, res) => {
+    try {
+        const activeCasesCount = await Case.countDocuments({ createdBy: req.user.id, status: 'ongoing' });
+        const closedCasesCount = await Case.countDocuments({ createdBy: req.user.id, status: 'closed' });
+
+        res.status(200).json({ activeCases: activeCasesCount, closedCases: closedCasesCount });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to retrieve case status count. Please try again later.' });
+    }
+});
+
+router.put('/update-case-status/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['ongoing', 'closed'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status value.' });
+    }
+
+    try {
+        const updatedCase = await Case.findOneAndUpdate(
+            { _id: id, createdBy: req.user.id },
+            { status },
+            { new: true }
+        );
+
+        if (!updatedCase) {
+            return res.status(404).json({ message: 'Case not found or access denied.' });
+        }
+
+        res.status(200).json({ message: 'Case status updated successfully', case: updatedCase });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to update case status. Please try again later.' });
+    }
+});
+
 
 module.exports = router;
