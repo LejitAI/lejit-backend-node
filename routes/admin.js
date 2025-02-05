@@ -822,6 +822,10 @@ router.get('/case-status-count', authenticateToken, async (req, res) => {
     }
 });
 
+
+
+
+// API to update the status of a case
 router.put('/update-case-status/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
@@ -847,6 +851,5 @@ router.put('/update-case-status/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Failed to update case status. Please try again later.' });
     }
 });
-
 
 module.exports = router;
