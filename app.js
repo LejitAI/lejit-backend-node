@@ -7,6 +7,10 @@ const adminRoutes = require('./routes/admin');
 const chatRoutes = require('./routes/chat');
 const ttsRoute = require('./routes/tts');
 const speechToTextRoute = require('./routes/speech-to-text');
+const teamMemberRoutes = require('./routes/teamMember'); // Import teamMember routes
+const lawFirmRoutes = require('./routes/lawFirm'); // Import lawFirm routes
+const caseRoutes = require('./routes/case'); // Import case routes
+const clientRoutes = require('./routes/client'); // Import client routes
 
 const cors=require("cors");
 const corsOptions ={
@@ -39,6 +43,11 @@ app.use('/api/speech-to-text', speechToTextRoute);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/team-member', teamMemberRoutes); // Add teamMember routes
+app.use('/api/law-firm', lawFirmRoutes); // Add lawFirm routes
+app.use('/api/client', clientRoutes); // Add client routes
+app.use('/api/case', caseRoutes); // Add case routes
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
