@@ -33,16 +33,15 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'Company name is required for corporates' });
         }
 
-        const newUser = new User({
+        const newUser = await User.createUser({
             role,
             username,
             email,
             password,
             law_firm_name: role === 'law_firm' ? law_firm_name : undefined,
             company_name: role === 'corporate' ? company_name : undefined,
+            validated: false
         });
-
-        await newUser.save();
 
         if (role === 'law_firm') {
             const teamMember = new TeamMember({
@@ -84,14 +83,14 @@ router.post('/register', async (req, res) => {
                     upiId: '',
                 },
                 password: password,
-                createdBy: newUser._id
+                createdBy: newUser.id
             });
 
             await teamMember.save();
         }
 
         const token = jwt.sign(
-            { id: newUser._id, role: newUser.role },
+            { id: newUser.id, role: newUser.role },
             process.env.JWT_SECRET
         );
 
@@ -99,7 +98,7 @@ router.post('/register', async (req, res) => {
             message: `${role} registered successfully`,
             token,
             user: {
-                id: newUser._id,
+                id: newUser.id,
                 username: newUser.username,
                 email: newUser.email,
                 role: newUser.role,
