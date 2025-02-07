@@ -23,7 +23,7 @@ const createTeamMember = async (teamMemberData) => {
 // ✅ Find a team member by email
 const findTeamMemberByEmail = async (email) => {
     try {
-        const query = 'SELECT * FROM team_members WHERE email = $1';
+        const query = 'SELECT * FROM team_members WHERE personal_details->>\'email\' = $1';
         const result = await pool.query(query, [email]);
 
         return result.rows[0];
