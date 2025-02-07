@@ -44,7 +44,7 @@ router.post('/register', async (req, res) => {
         });
 
         if (role === 'law_firm') {
-            const teamMember = new TeamMember({
+            const teamMember = await TeamMember.createTeamMember({
                 personalDetails: {
                     name: username,
                     email: email,
