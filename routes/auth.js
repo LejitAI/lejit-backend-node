@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db'); // PostgreSQL connection
 const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
-const User = require('../models/User');
+const User = require('../models/User'); // Ensure this is the correct path to the User model
 const TeamMember = require('../models/TeamMember');
 const router = express.Router();
 
@@ -20,7 +20,7 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'Passwords do not match' });
         }
 
-        const existingUser = await User.findOne({ email });
+        const existingUser = await User.findUserByEmail(email); // Use the correct method to find user by email
         if (existingUser) {
             return res.status(400).json({ message: 'Email or Username is already registered' });
         }
