@@ -18,7 +18,7 @@ router.post('/set-chatgpt-api-key', authenticateToken, async (req, res) => {
     const { chatgptApiKey } = req.body;
 
     if (!chatgptApiKey) {
-        return res.status(400).json({ message: 'API key is required' });
+        return res.status(400).json({ status: false, message: 'API key is required', data: {} });
     }
 
     try {
@@ -33,20 +33,20 @@ router.post('/set-chatgpt-api-key', authenticateToken, async (req, res) => {
             settings = new Settings({ chatgptApiKey });
             await settings.save();
         }
-        res.status(200).json({ message: 'ChatGPT API key saved successfully' });
+        res.status(200).json({ status: true, message: 'ChatGPT API key saved successfully', data: {} });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ status: false, message: 'Server error', data: {} });
     }
 });
 
 router.get('/get-users', authenticateToken, async (req, res) => {
     try {
         const users = await User.find({}, 'username _id validated'); // Only select the fields we need
-        res.status(200).json(users);
+        res.status(200).json({ status: true, message: 'Users retrieved successfully', data: users });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ status: false, message: 'Server error', data: {} });
     }
 });
 
@@ -56,12 +56,12 @@ router.get('/get-chatgpt-api-key', authenticateToken, async (req, res) => {
     try {
         const settings = await Settings.findOne();
         if (!settings || !settings.chatgptApiKey) {
-            return res.status(404).json({ message: 'API key not found' });
+            return res.status(404).json({ status: false, message: 'API key not found', data: {} });
         }
-        res.status(200).json({ chatgptApiKey: settings.chatgptApiKey });
+        res.status(200).json({ status: true, message: 'API key retrieved successfully', data: { chatgptApiKey: settings.chatgptApiKey } });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ status: false, message: 'Server error', data: {} });
     }
 });
 
@@ -86,14 +86,14 @@ router.post('/add-team-member', authenticateToken, async (req, res) => {
         });
 
         await newTeamMember.save();
-        res.status(201).json({ message: 'Team member added successfully', teamMember: newTeamMember });
+        res.status(201).json({ status: true, message: 'Team member added successfully', data: { teamMember: newTeamMember } });
     } catch (error) {
         // Handle unique email constraint error
         if (error.code === 11000 && error.keyPattern && error.keyPattern['personalDetails.email']) {
-            return res.status(400).json({ message: 'Email is already in use. Please use a different email.' });
+            return res.status(400).json({ status: false, message: 'Email is already in use. Please use a different email.', data: {} });
         }
         console.error(error);
-        res.status(500).json({ message: 'Failed to add team member. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to add team member. Please try again later.', data: {} });
     }
     
 });
@@ -110,13 +110,13 @@ router.delete('/delete-team-member/:id', authenticateToken, async (req, res) => 
         });
 
         if (!deletedMember) {
-            return res.status(404).json({ message: 'Team member not found or access denied.' });
+            return res.status(404).json({ status: false, message: 'Team member not found or access denied.', data: {} });
         }
 
-        res.status(200).json({ message: 'Team member deleted successfully.' });
+        res.status(200).json({ status: true, message: 'Team member deleted successfully.', data: {} });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to delete team member. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to delete team member. Please try again later.', data: {} });
     }
 });
 
@@ -129,13 +129,13 @@ router.get('/get-team-member-details/:id', authenticateToken, async (req, res) =
         const teamMember = await TeamMember.findById(id).select('-password');
 
         if (!teamMember) {
-            return res.status(404).json({ message: 'Team member not found.' });
+            return res.status(404).json({ status: false, message: 'Team member not found.', data: {} });
         }
 
-        res.status(200).json(teamMember);
+        res.status(200).json({ status: true, message: 'Team member details retrieved successfully', data: teamMember });
     } catch (error) {
         console.error('Error fetching team member details:', error);
-        res.status(500).json({ message: 'Failed to fetch team member details. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to fetch team member details. Please try again later.', data: {} });
     }
 });
 
@@ -144,10 +144,10 @@ router.get('/get-team-member-details/:id', authenticateToken, async (req, res) =
 router.get('/get-law-firms', authenticateToken, async (req, res) => {
     try {
         const lawFirms = await User.find({ role: 'law_firm' }, 'law_firm_name _id');
-        res.status(200).json(lawFirms);
+        res.status(200).json({ status: true, message: 'Law firms retrieved successfully', data: lawFirms });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to fetch law firms. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to fetch law firms. Please try again later.', data: {} });
     }
 });
 
@@ -160,13 +160,13 @@ router.get('/get-team-members-by-law-firm/:lawFirmId', authenticateToken, async 
         const teamMembers = await TeamMember.find({ createdBy: lawFirmId }).populate('createdBy', 'law_firm_name');
 
         if (teamMembers.length === 0) {
-            return res.status(404).json({ message: 'No team members found for this law firm.' });
+            return res.status(404).json({ status: false, message: 'No team members found for this law firm.', data: {} });
         }
 
-        res.status(200).json(teamMembers);
+        res.status(200).json({ status: true, message: 'Team members retrieved successfully', data: teamMembers });
     } catch (error) {
         console.error('Error fetching team members:', error);
-        res.status(500).json({ message: 'Failed to fetch team members. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to fetch team members. Please try again later.', data: {} });
     }
 });
 
@@ -180,13 +180,13 @@ router.get('/get-all-law-firms', authenticateToken, async (req, res) => {
         const lawFirms = await ImageForm.find({}, 'lawFirmDetails professionalDetails bankAccountDetails createdAt createdBy');
 
         if (!lawFirms || lawFirms.length === 0) {
-            return res.status(404).json({ message: 'No law firms found.' });
+            return res.status(404).json({ status: false, message: 'No law firms found.', data: {} });
         }
 
-        res.status(200).json(lawFirms);
+        res.status(200).json({ status: true, message: 'Law firms retrieved successfully', data: lawFirms });
     } catch (error) {
         console.error('Error fetching law firms:', error);
-        res.status(500).json({ message: 'Failed to fetch law firms. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to fetch law firms. Please try again later.', data: {} });
     }
 });
 
@@ -199,13 +199,13 @@ router.get('/get-law-firm-details/:id', authenticateToken, async (req, res) => {
         const lawFirmDetails = await ImageForm.findOne({ createdBy: id });
 
         if (!lawFirmDetails) {
-            return res.status(404).json({ message: 'Law firm details not found.' });
+            return res.status(404).json({ status: false, message: 'Law firm details not found.', data: {} });
         }
 
-        res.status(200).json(lawFirmDetails);
+        res.status(200).json({ status: true, message: 'Law firm details retrieved successfully', data: lawFirmDetails });
     } catch (error) {
         console.error('Error fetching law firm details:', error);
-        res.status(500).json({ message: 'Failed to fetch law firm details. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to fetch law firm details. Please try again later.', data: {} });
     }
 });
 
@@ -215,10 +215,10 @@ router.get('/get-law-firm-details/:id', authenticateToken, async (req, res) => {
 router.get('/get-law-firms', authenticateToken, async (req, res) => {
     try {
         const lawFirms = await User.find({ role: 'law_firm' }, 'law_firm _id'); // Fetch law firm names and IDs
-        res.status(200).json(lawFirms);
+        res.status(200).json({ status: true, message: 'Law firms retrieved successfully', data: lawFirms });
     } catch (error) {
         console.error('Error fetching law firms:', error);
-        res.status(500).json({ message: 'Failed to fetch law firms. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to fetch law firms. Please try again later.', data: {} });
     }
 });
 
@@ -227,10 +227,10 @@ router.get('/get-team-members-by-law-firm/:lawFirmId', authenticateToken, async 
     const { lawFirmId } = req.params;
     try {
         const teamMembers = await TeamMember.find({ createdBy: lawFirmId }, '-password').sort({ createdAt: -1 });
-        res.status(200).json(teamMembers);
+        res.status(200).json({ status: true, message: 'Team members retrieved successfully', data: teamMembers });
     } catch (error) {
         console.error('Error fetching team members:', error);
-        res.status(500).json({ message: 'Failed to fetch team members. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to fetch team members. Please try again later.', data: {} });
     }
 });
 
@@ -250,7 +250,7 @@ router.post('/add-case', authenticateToken, async (req, res) => {
     } = req.body;
 
     if (!title || !startingDate || !caseType || !client) {
-        return res.status(400).json({ message: 'Please fill in all required fields.' });
+        return res.status(400).json({ status: false, message: 'Please fill in all required fields.', data: {} });
     }
 
     try {
@@ -269,10 +269,10 @@ router.post('/add-case', authenticateToken, async (req, res) => {
         });
 
         await newCase.save();
-        res.status(201).json({ message: 'Case added successfully', case: newCase });
+        res.status(201).json({ status: true, message: 'Case added successfully', data: { case: newCase } });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to add case. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to add case. Please try again later.', data: {} });
     }
 });
 // API to delete a case
@@ -287,13 +287,13 @@ router.delete('/delete-case/:id', authenticateToken, async (req, res) => {
         });
 
         if (!deletedCase) {
-            return res.status(404).json({ message: 'Case not found or access denied.' });
+            return res.status(404).json({ status: false, message: 'Case not found or access denied.', data: {} });
         }
 
-        res.status(200).json({ message: 'Case deleted successfully.' });
+        res.status(200).json({ status: true, message: 'Case deleted successfully.', data: {} });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to delete case. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to delete case. Please try again later.', data: {} });
     }
 });
 
@@ -305,10 +305,10 @@ router.get('/get-team-members', authenticateToken, async (req, res) => {
     try {
         // Fetch team members created by the logged-in user
         const teamMembers = await TeamMember.find({ createdBy: req.user.id }, '-password').sort({ createdAt: -1 });
-        res.status(200).json(teamMembers);
+        res.status(200).json({ status: true, message: 'Team members retrieved successfully', data: teamMembers });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve team members. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to retrieve team members. Please try again later.', data: {} });
     }
 });
 
@@ -332,10 +332,10 @@ router.post('/add-law-firm-details', authenticateToken, async (req, res) => {
         });
 
         await newLawFirmDetails.save();
-        res.status(201).json({ message: 'Law firm details added successfully', lawFirmDetails: newLawFirmDetails });
+        res.status(201).json({ status: true, message: 'Law firm details added successfully', data: { lawFirmDetails: newLawFirmDetails } });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to add law firm details. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to add law firm details. Please try again later.', data: {} });
     }
 });
 
@@ -345,13 +345,13 @@ router.get('/get-law-firm-details', authenticateToken, async (req, res) => {
         const lawFirmDetails = await ImageForm.findOne({ createdBy: req.user.id }); // Find the details created by the logged-in admin
         
         if (!lawFirmDetails) {
-            return res.status(404).json({ message: 'Law firm details not found' });
+            return res.status(404).json({ status: false, message: 'Law firm details not found', data: {} });
         }
 
-        res.status(200).json(lawFirmDetails);
+        res.status(200).json({ status: true, message: 'Law firm details retrieved successfully', data: lawFirmDetails });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve law firm details. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to retrieve law firm details. Please try again later.', data: {} });
     }
 });
 
@@ -372,13 +372,13 @@ router.put('/update-law-firm-details', authenticateToken, async (req, res) => {
         );
 
         if (!updatedDetails) {
-            return res.status(404).json({ message: 'Law firm details not found' });
+            return res.status(404).json({ status: false, message: 'Law firm details not found', data: {} });
         }
 
-        res.status(200).json({ message: 'Law firm details updated successfully', updatedDetails });
+        res.status(200).json({ status: true, message: 'Law firm details updated successfully', data: updatedDetails });
     } catch (error) {
         console.error('Error updating law firm details:', error);
-        res.status(500).json({ message: 'Failed to update law firm details. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to update law firm details. Please try again later.', data: {} });
     }
 });
 
@@ -388,10 +388,10 @@ router.get('/get-cases', authenticateToken, async (req, res) => {
     try {
         // Retrieve cases created by the logged-in user
         const cases = await Case.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
-        res.status(200).json(cases);
+        res.status(200).json({ status: true, message: 'Cases retrieved successfully', data: cases });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve cases. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to retrieve cases. Please try again later.', data: {} });
     }
 });
 
@@ -404,18 +404,18 @@ router.get('/get-case/:id', authenticateToken, async (req, res) => {
         const caseDetail = await Case.findOne({ _id: id, createdBy: req.user.id });
 
         if (!caseDetail) {
-            return res.status(404).json({ message: 'Case not found or you do not have permission to view it.' });
+            return res.status(404).json({ status: false, message: 'Case not found or you do not have permission to view it.', data: {} });
         }
 
-        res.status(200).json(caseDetail);
+        res.status(200).json({ status: true, message: 'Case retrieved successfully', data: caseDetail });
     } catch (error) {
         console.error(error);
 
         if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Invalid case ID format.' });
+            return res.status(400).json({ status: false, message: 'Invalid case ID format.', data: {} });
         }
 
-        res.status(500).json({ message: 'Failed to retrieve the case. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to retrieve the case. Please try again later.', data: {} });
     }
 });
 
@@ -432,7 +432,7 @@ router.post('/add-client', authenticateToken, async (req, res) => {
     } = req.body;
 
     if (!name || !dateOfBirth || !gender || !email || !mobile || !address) {
-        return res.status(400).json({ message: 'Please fill in all required fields.' });
+        return res.status(400).json({ status: false, message: 'Please fill in all required fields.', data: {} });
     }
 
     try {
@@ -449,10 +449,10 @@ router.post('/add-client', authenticateToken, async (req, res) => {
         });
 
         await newClient.save();
-        res.status(201).json({ message: 'Client details saved successfully', client: newClient });
+        res.status(201).json({ status: true, message: 'Client details saved successfully', data: { client: newClient } });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to save client details. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to save client details. Please try again later.', data: {} });
     }
 });
 
@@ -464,13 +464,13 @@ router.get('/get-client', authenticateToken, async (req, res) => {
         const clients = await Client.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
         
         if (!clients || clients.length === 0) {
-            return res.status(200).json([]); // Return an empty array if no clients are found
+            return res.status(200).json({ status: true, message: 'No clients found', data: [] });
         }
 
-        res.status(200).json(clients);
+        res.status(200).json({ status: true, message: 'Clients retrieved successfully', data: clients });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve client details. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to retrieve client details. Please try again later.', data: {} });
     }
 });
 
@@ -485,13 +485,13 @@ router.delete('/delete-client/:id', authenticateToken, async (req, res) => {
         });
 
         if (!deletedClient) {
-            return res.status(404).json({ message: 'Client not found or access denied.' });
+            return res.status(404).json({ status: false, message: 'Client not found or access denied.', data: {} });
         }
 
-        res.status(200).json({ message: 'Client deleted successfully.' });
+        res.status(200).json({ status: true, message: 'Client deleted successfully.', data: {} });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to delete client. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to delete client. Please try again later.', data: {} });
     }
 });
 
@@ -506,21 +506,21 @@ router.post("/book-appointment", authenticateToken, async (req, res) => {
 
   // Validate required fields
   if (!clientId || !appointmentDate || !appointmentTime) {
-    return res.status(400).json({ message: "Missing required fields: clientId, appointmentDate, appointmentTime." });
+    return res.status(400).json({ status: false, message: "Missing required fields: clientId, appointmentDate, appointmentTime.", data: {} });
   }
 
   try {
     // Validate the client exists
     const client = await Client.findById(clientId);
     if (!client) {
-      return res.status(404).json({ message: "Client not found." });
+      return res.status(404).json({ status: false, message: "Client not found.", data: {} });
     }
 
     // Fetch the logged-in user's lawyer ID and law firm ID dynamically
     const lawyerId = req.user.id; // Assuming the logged-in user is the lawyer
     const lawFirm = await User.findById(req.user.createdBy, '_id role');
     if (!lawFirm || lawFirm.role !== "law_firm") {
-      return res.status(404).json({ message: "Law firm not found or invalid role." });
+      return res.status(404).json({ status: false, message: "Law firm not found or invalid role.", data: {} });
     }
 
     // Validate the appointment time slot
@@ -531,7 +531,7 @@ router.post("/book-appointment", authenticateToken, async (req, res) => {
     });
 
     if (existingAppointment) {
-      return res.status(400).json({ message: "This time slot is already booked." });
+      return res.status(400).json({ status: false, message: "This time slot is already booked.", data: {} });
     }
 
     // Create the new appointment
@@ -546,10 +546,10 @@ router.post("/book-appointment", authenticateToken, async (req, res) => {
     });
 
     await newAppointment.save();
-    res.status(201).json({ message: "Appointment booked successfully.", appointment: newAppointment });
+    res.status(201).json({ status: true, message: "Appointment booked successfully.", data: { appointment: newAppointment } });
   } catch (error) {
     console.error("Error booking appointment:", error);
-    res.status(500).json({ message: "Failed to book appointment. Please try again later." });
+    res.status(500).json({ status: false, message: "Failed to book appointment. Please try again later.", data: {} });
   }
 });
 
@@ -580,10 +580,10 @@ router.get('/appointments', authenticateToken, async (req, res) => {
       }
     }));
 
-    res.status(200).json(formattedAppointments);
+    res.status(200).json({ status: true, message: 'Appointments retrieved successfully', data: formattedAppointments });
   } catch (error) {
     console.error('Error fetching appointments:', error);
-    res.status(500).json({ message: 'Failed to fetch appointments' });
+    res.status(500).json({ status: false, message: 'Failed to fetch appointments', data: {} });
   }
 });
 
@@ -600,13 +600,13 @@ router.patch('/appointments/:id/status', authenticateToken, async (req, res) => 
     );
 
     if (!appointment) {
-      return res.status(404).json({ message: 'Appointment not found' });
+      return res.status(404).json({ status: false, message: 'Appointment not found', data: {} });
     }
 
-    res.status(200).json({ message: `Appointment ${status} successfully` });
+    res.status(200).json({ status: true, message: `Appointment ${status} successfully`, data: {} });
   } catch (error) {
     console.error('Error updating appointment:', error);
-    res.status(500).json({ message: 'Failed to update appointment' });
+    res.status(500).json({ status: false, message: 'Failed to update appointment', data: {} });
   }
 });
 
@@ -632,10 +632,10 @@ router.get('/get-hearings', authenticateToken, async (req, res) => {
             };
         });
 
-        res.status(200).json(hearingsWithEndTime);
+        res.status(200).json({ status: true, message: 'Hearings retrieved successfully', data: hearingsWithEndTime });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve hearings.' });
+        res.status(500).json({ status: false, message: 'Failed to retrieve hearings.', data: {} });
     }
 });
 
@@ -654,14 +654,14 @@ router.post('/add-hearing', authenticateToken, async (req, res) => {
     } = req.body;
 
     if (!caseId || !date || !time || !location) {
-        return res.status(400).json({ message: 'Missing required fields.' });
+        return res.status(400).json({ status: false, message: 'Missing required fields.', data: {} });
     }
 
     try {
         // Verify case existence
         const existingCase = await Case.findById(caseId);
         if (!existingCase) {
-            return res.status(404).json({ message: 'Case not found.' });
+            return res.status(404).json({ status: false, message: 'Case not found.', data: {} });
         }
 
         // Validate time conflict
@@ -678,7 +678,7 @@ router.post('/add-hearing', authenticateToken, async (req, res) => {
         });
 
         if (conflict) {
-            return res.status(400).json({ message: 'Hearing time conflicts with an existing schedule.' });
+            return res.status(400).json({ status: false, message: 'Hearing time conflicts with an existing schedule.', data: {} });
         }
 
         const newHearing = new Hearing({
@@ -696,10 +696,10 @@ router.post('/add-hearing', authenticateToken, async (req, res) => {
         });
 
         await newHearing.save();
-        res.status(201).json({ message: 'Hearing scheduled successfully', hearing: newHearing });
+        res.status(201).json({ status: true, message: 'Hearing scheduled successfully', data: { hearing: newHearing } });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to schedule hearing.' });
+        res.status(500).json({ status: false, message: 'Failed to schedule hearing.', data: {} });
     }
 });
 
@@ -714,13 +714,13 @@ router.get('/get-hearing/:id', authenticateToken, async (req, res) => {
         .populate('caseId', 'title caseType');
 
         if (!hearing) {
-            return res.status(404).json({ message: 'Hearing not found.' });
+            return res.status(404).json({ status: false, message: 'Hearing not found.', data: {} });
         }
 
-        res.status(200).json(hearing);
+        res.status(200).json({ status: true, message: 'Hearing details retrieved successfully', data: hearing });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve hearing details.' });
+        res.status(500).json({ status: false, message: 'Failed to retrieve hearing details.', data: {} });
     }
 });
 
@@ -739,13 +739,13 @@ router.put('/update-hearing/:id', authenticateToken, async (req, res) => {
         );
 
         if (!updatedHearing) {
-            return res.status(404).json({ message: 'Hearing not found.' });
+            return res.status(404).json({ status: false, message: 'Hearing not found.', data: {} });
         }
 
-        res.status(200).json({ message: 'Hearing updated successfully', hearing: updatedHearing });
+        res.status(200).json({ status: true, message: 'Hearing updated successfully', data: { hearing: updatedHearing } });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to update hearing.' });
+        res.status(500).json({ status: false, message: 'Failed to update hearing.', data: {} });
     }
 });
 
@@ -758,13 +758,13 @@ router.delete('/delete-hearing/:id', authenticateToken, async (req, res) => {
         });
 
         if (!deletedHearing) {
-            return res.status(404).json({ message: 'Hearing not found.' });
+            return res.status(404).json({ status: false, message: 'Hearing not found.', data: {} });
         }
 
-        res.status(200).json({ message: 'Hearing deleted successfully' });
+        res.status(200).json({ status: true, message: 'Hearing deleted successfully', data: {} });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to delete hearing.' });
+        res.status(500).json({ status: false, message: 'Failed to delete hearing.', data: {} });
     }
 });
 
@@ -775,10 +775,10 @@ router.get('/get-upcoming-hearings', authenticateToken, async (req, res) => {
             .populate('client', 'name')
             .populate('caseId', 'title caseType');
         
-        res.status(200).json(upcomingHearings);
+        res.status(200).json({ status: true, message: 'Upcoming hearings retrieved successfully', data: upcomingHearings });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve upcoming hearings.' });
+        res.status(500).json({ status: false, message: 'Failed to retrieve upcoming hearings.', data: {} });
     }
 });
 
@@ -788,7 +788,7 @@ router.put('/update-case-timer/:id', authenticateToken, async (req, res) => {
     const { timer, isRunning } = req.body;
 
     if (typeof timer !== 'number' || typeof isRunning !== 'boolean') {
-        return res.status(400).json({ message: 'Invalid timer or isRunning value.' });
+        return res.status(400).json({ status: false, message: 'Invalid timer or isRunning value.', data: {} });
     }
 
     try {
@@ -799,13 +799,13 @@ router.put('/update-case-timer/:id', authenticateToken, async (req, res) => {
         );
 
         if (!updatedCase) {
-            return res.status(404).json({ message: 'Case not found or access denied.' });
+            return res.status(404).json({ status: false, message: 'Case not found or access denied.', data: {} });
         }
 
-        res.status(200).json({ message: 'Timer updated successfully', case: updatedCase });
+        res.status(200).json({ status: true, message: 'Timer updated successfully', data: { case: updatedCase } });
     } catch (error) {
         console.error('Error updating timer:', error);
-        res.status(500).json({ message: 'Failed to update timer. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to update timer. Please try again later.', data: {} });
     }
 });
 
@@ -815,10 +815,10 @@ router.get('/case-status-count', authenticateToken, async (req, res) => {
         const activeCasesCount = await Case.countDocuments({ createdBy: req.user.id, status: 'ongoing' });
         const closedCasesCount = await Case.countDocuments({ createdBy: req.user.id, status: 'closed' });
 
-        res.status(200).json({ activeCases: activeCasesCount, closedCases: closedCasesCount });
+        res.status(200).json({ status: true, message: 'Case status count retrieved successfully', data: { activeCases: activeCasesCount, closedCases: closedCasesCount } });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to retrieve case status count. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to retrieve case status count. Please try again later.', data: {} });
     }
 });
 
@@ -831,7 +831,7 @@ router.put('/update-case-status/:id', authenticateToken, async (req, res) => {
     const { status } = req.body;
 
     if (!['ongoing', 'closed'].includes(status)) {
-        return res.status(400).json({ message: 'Invalid status value.' });
+        return res.status(400).json({ status: false, message: 'Invalid status value.', data: {} });
     }
 
     try {
@@ -842,13 +842,13 @@ router.put('/update-case-status/:id', authenticateToken, async (req, res) => {
         );
 
         if (!updatedCase) {
-            return res.status(404).json({ message: 'Case not found or access denied.' });
+            return res.status(404).json({ status: false, message: 'Case not found or access denied.', data: {} });
         }
 
-        res.status(200).json({ message: 'Case status updated successfully', case: updatedCase });
+        res.status(200).json({ status: true, message: 'Case status updated successfully', data: { case: updatedCase } });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Failed to update case status. Please try again later.' });
+        res.status(500).json({ status: false, message: 'Failed to update case status. Please try again later.', data: {} });
     }
 });
 
