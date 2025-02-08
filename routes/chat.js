@@ -18,7 +18,12 @@ const TAGS_FILE = path.join(__dirname, 'caseTags.json');
 const loadTags = () => {
     if (fs.existsSync(TAGS_FILE)) {
         const data = fs.readFileSync(TAGS_FILE, 'utf-8');
-        return JSON.parse(data);
+        try {
+            return JSON.parse(data);
+        } catch (error) {
+            console.error('Error parsing JSON:', error.message);
+            return {};
+        }
     }
     return {};
 };
