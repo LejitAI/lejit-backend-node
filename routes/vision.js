@@ -4,28 +4,55 @@ const fs = require('fs');
 const pdfParse = require('pdf-parse');
 const { fromPath } = require('pdf2pic');
 const OpenAI = require('openai');
+const path = require('path');
 
 const router = express.Router();
-const upload = multer({ dest: 'ocrpdfs/' });
-
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// 🔹 Multer storage setup: Save files with their original names
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'ocrpdfs/'); // Save in "ocrpdfs" folder
+    },
+    filename: (req, file, cb) => {
+        cb(null, file.originalname); // Save with original name
+    }
+});
+
+const upload = multer({ storage });
+
+// 🔹 Allowed file types
+const allowedExtensions = ['.jpg', '.jpeg', '.png', '.pdf'];
 
 router.post('/', upload.single('file'), async (req, res) => {
     try {
-        const filePath = req.file.path;
-        const fileType = req.file.mimetype;
-        let extractedText = '';
-        console.log('File uploaded:', req.file.originalname);
-        console.log('File type:', fileType);
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
 
-        if (fileType === 'application/pdf') {
-            // Step 1: Convert PDF pages to images
+        const filePath = req.file.path;
+        const fileName = req.file.originalname;
+        const fileExt = path.extname(fileName).toLowerCase();
+
+        console.log(`File uploaded: ${fileName}`);
+        console.log(`File type: ${fileExt}`);
+
+        // 🔹 Check if file type is allowed
+        if (!allowedExtensions.includes(fileExt)) {
+            fs.unlinkSync(filePath); // Delete unsupported file
+            return res.status(400).json({ error: 'Unsupported file format. Please upload a PDF or an image (jpg, png).' });
+        }
+
+        let extractedText = '';
+
+        if (fileExt === '.pdf') {
+            // 📌 Handle PDF Extraction
             const outputPath = `ocrpdfs/page`; // Image output prefix
             const convert = fromPath(filePath, {
-                density: 300, // High resolution for better OCR accuracy
+                density: 300,
                 saveFilename: 'pdf_page',
                 savePath: 'ocrpdfs',
-                format: 'png', // Output format
+                format: 'png',
                 width: 1200,
                 height: 1600
             });
@@ -44,7 +71,7 @@ router.post('/', upload.single('file'), async (req, res) => {
 
             console.log('Conversion complete. Processing images with OpenAI...');
 
-            // Step 2: Extract text from each image using OpenAI Vision
+            // 🔹 Process each image with OpenAI Vision
             let textArray = [];
             for (const imagePath of imageFiles) {
                 const imageBase64 = fs.readFileSync(imagePath, { encoding: 'base64' });
@@ -66,10 +93,10 @@ router.post('/', upload.single('file'), async (req, res) => {
                 textArray.push(response.choices[0].message.content);
             }
 
-            extractedText = textArray.join('\n'); // Combine all pages' text
+            extractedText = textArray.join('\n'); // Combine text from all pages
 
-        } else if (fileType.startsWith('image/')) {
-            // Process images normally
+        } else {
+            // 📌 Handle Image Extraction (jpg, png)
             const imageBase64 = fs.readFileSync(filePath, { encoding: 'base64' });
 
             const response = await openai.chat.completions.create({
@@ -87,8 +114,6 @@ router.post('/', upload.single('file'), async (req, res) => {
             });
 
             extractedText = response.choices[0].message.content;
-        } else {
-            return res.status(400).json({ error: 'Unsupported file format. Please upload a PDF or an image.' });
         }
 
         res.json({ text: extractedText });
@@ -98,7 +123,11 @@ router.post('/', upload.single('file'), async (req, res) => {
         res.status(500).json({ error: 'File processing failed' });
     } finally {
         // Cleanup: remove uploaded files
-        fs.unlinkSync(req.file.path);
+        try {
+            fs.unlinkSync(req.file.path);
+        } catch (err) {
+            console.warn(`Failed to delete file: ${req.file.path}`, err);
+        }
     }
 });
 
