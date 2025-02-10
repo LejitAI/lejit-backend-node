@@ -4,28 +4,71 @@ const fs = require('fs');
 const pdfParse = require('pdf-parse');
 const { fromPath } = require('pdf2pic');
 const OpenAI = require('openai');
+const path = require('path');
 
 const router = express.Router();
-const upload = multer({ dest: 'ocrpdfs/' });
-
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-router.post('/', upload.single('file'), async (req, res) => {
-    try {
-        const filePath = req.file.path;
-        const fileType = req.file.mimetype;
-        let extractedText = '';
-        console.log('File uploaded:', req.file.originalname);
-        console.log('File type:', fileType);
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'ocrpdfs/'),
+    filename: (req, file, cb) => cb(null, file.originalname)
+});
+const upload = multer({ storage });
+const allowedExtensions = ['.jpg', '.jpeg', '.png', '.pdf'];
 
-        if (fileType === 'application/pdf') {
-            // Step 1: Convert PDF pages to images
-            const outputPath = `ocrpdfs/page`; // Image output prefix
+/**
+ * @swagger
+ * /api/ocr:
+ *   post:
+ *     summary: Extract text from uploaded image or PDF
+ *     description: Upload a PDF or image file, convert to text using OpenAI API.
+ *     tags:
+ *       - OCR
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Extracted text from the file
+ *       400:
+ *         description: No file uploaded or unsupported format
+ *       500:
+ *         description: File processing failed
+ */
+router.post('/', upload.single('file'), async (req, res) => {
+    let imageFiles = []; // Store generated image paths for cleanup
+
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+        const filePath = req.file.path;
+        const fileName = req.file.originalname;
+        const fileExt = path.extname(fileName).toLowerCase();
+
+        console.log(`File uploaded: ${fileName}`);
+        console.log(`File type: ${fileExt}`);
+
+        if (!allowedExtensions.includes(fileExt)) {
+            fs.unlinkSync(filePath);
+            return res.status(400).json({ error: 'Unsupported file format. Upload a PDF or an image.' });
+        }
+
+        let extractedText = '';
+
+        if (fileExt === '.pdf') {
+            // PDF to Image Conversion
             const convert = fromPath(filePath, {
-                density: 300, // High resolution for better OCR accuracy
+                density: 300,
                 saveFilename: 'pdf_page',
                 savePath: 'ocrpdfs',
-                format: 'png', // Output format
+                format: 'png',
                 width: 1200,
                 height: 1600
             });
@@ -36,7 +79,6 @@ router.post('/', upload.single('file'), async (req, res) => {
 
             console.log(`PDF has ${numPages} pages. Converting to images...`);
 
-            let imageFiles = [];
             for (let i = 1; i <= numPages; i++) {
                 await convert(i, { responseType: 'image' });
                 imageFiles.push(`ocrpdfs/pdf_page.${i}.png`);
@@ -44,7 +86,6 @@ router.post('/', upload.single('file'), async (req, res) => {
 
             console.log('Conversion complete. Processing images with OpenAI...');
 
-            // Step 2: Extract text from each image using OpenAI Vision
             let textArray = [];
             for (const imagePath of imageFiles) {
                 const imageBase64 = fs.readFileSync(imagePath, { encoding: 'base64' });
@@ -52,13 +93,8 @@ router.post('/', upload.single('file'), async (req, res) => {
                 const response = await openai.chat.completions.create({
                     model: 'gpt-4o-mini',
                     messages: [
-                        {
-                            role: 'user',
-                            content: [
-                                { type: 'text', text: 'Extract all text from this handwritten document. Do not include extra information.' },
-                                { type: 'image_url', image_url: { url: `data:image/png;base64,${imageBase64}` } },
-                            ],
-                        },
+                        { role: 'user', content: [{ type: 'text', text: 'Extract all text from this handwritten document. Do not include extra information.' },
+                        { type: 'image_url', image_url: { url: `data:image/png;base64,${imageBase64}` } }] }
                     ],
                     max_tokens: 1000,
                 });
@@ -66,29 +102,22 @@ router.post('/', upload.single('file'), async (req, res) => {
                 textArray.push(response.choices[0].message.content);
             }
 
-            extractedText = textArray.join('\n'); // Combine all pages' text
+            extractedText = textArray.join('\n');
 
-        } else if (fileType.startsWith('image/')) {
-            // Process images normally
+        } else {
+            // Image Processing
             const imageBase64 = fs.readFileSync(filePath, { encoding: 'base64' });
 
             const response = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 messages: [
-                    {
-                        role: 'user',
-                        content: [
-                            { type: 'text', text: 'Extract all text from this image, including handwriting.' },
-                            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
-                        ],
-                    },
+                    { role: 'user', content: [{ type: 'text', text: 'Extract all text from this image, including handwriting. Be professional and send only text.' },
+                    { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }] }
                 ],
                 max_tokens: 1000,
             });
 
             extractedText = response.choices[0].message.content;
-        } else {
-            return res.status(400).json({ error: 'Unsupported file format. Please upload a PDF or an image.' });
         }
 
         res.json({ text: extractedText });
@@ -97,8 +126,21 @@ router.post('/', upload.single('file'), async (req, res) => {
         console.error('Error processing file:', error);
         res.status(500).json({ error: 'File processing failed' });
     } finally {
-        // Cleanup: remove uploaded files
-        fs.unlinkSync(req.file.path);
+        // Cleanup uploaded file
+        try {
+            if (req.file) fs.unlinkSync(req.file.path);
+        } catch (err) {
+            console.warn(`Failed to delete uploaded file: ${req.file.path}`, err);
+        }
+
+        // Cleanup generated images
+        for (const imagePath of imageFiles) {
+            try {
+                fs.unlinkSync(imagePath);
+            } catch (err) {
+                console.warn(`Failed to delete image: ${imagePath}`, err);
+            }
+        }
     }
 });
 
