@@ -16,6 +16,32 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 const allowedExtensions = ['.jpg', '.jpeg', '.png', '.pdf'];
 
+/**
+ * @swagger
+ * /api/ocr:
+ *   post:
+ *     summary: Extract text from uploaded image or PDF
+ *     description: Upload a PDF or image file, convert to text using OpenAI API.
+ *     tags:
+ *       - OCR
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Extracted text from the file
+ *       400:
+ *         description: No file uploaded or unsupported format
+ *       500:
+ *         description: File processing failed
+ */
 router.post('/', upload.single('file'), async (req, res) => {
     let imageFiles = []; // Store generated image paths for cleanup
 
