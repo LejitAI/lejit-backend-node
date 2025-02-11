@@ -7,6 +7,42 @@ const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 
 // Register a new user (Citizen, Law Firm, Corporate)
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user (Citizen, Law Firm, Corporate)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               confirmPassword:
+ *                 type: string
+ *               law_firm_name:
+ *                 type: string
+ *                 description: Required if role is 'law_firm'
+ *               company_name:
+ *                 type: string
+ *                 description: Required if role is 'corporate'
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Failed to register user
+ */
 router.post('/register', async (req, res) => {
     const { role, username, email, password, confirmPassword, law_firm_name, company_name } = req.body;
 
@@ -112,6 +148,32 @@ router.post('/register', async (req, res) => {
 });
 
 // Login
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: User login
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successful login
+ *       400:
+ *         description: Missing credentials
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -160,6 +222,21 @@ router.post('/login', async (req, res) => {
 });
 
 // Fetch User Profile (Shared for all roles)
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   get:
+ *     summary: Fetch user profile
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profile retrieved successfully
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
@@ -190,6 +267,19 @@ router.get('/profile', authenticateToken, async (req, res) => {
 });
 
 // Signout
+/**
+ * @swagger
+ * /api/auth/signout:
+ *   post:
+ *     summary: User signout
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Signed out successfully
+ *       500:
+ *         description: Server error
+ */
 router.post('/signout', authenticateToken, async (req, res) => {
     try {
         res.status(200).json({ message: 'Signed out successfully' });

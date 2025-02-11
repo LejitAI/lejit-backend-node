@@ -1,4 +1,3 @@
-
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
@@ -32,6 +31,42 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+/**
+ * @swagger
+ * /api/speech-to-text:
+ *   post:
+ *     summary: Convert speech to text
+ *     description: Upload an audio file to transcribe speech to text using OpenAI's Whisper model.
+ *     tags: [Speech-to-Text]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               audio:
+ *                 type: string
+ *                 format: binary
+ *                 description: Audio file to be transcribed (e.g., .mp3, .wav, .mp4, .mpeg, .mpga, .m4a, .webm).
+ *     responses:
+ *       '200':
+ *         description: Successful transcription
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 transcription:
+ *                   type: string
+ *                   description: The transcribed text from the audio.
+ *       '400':
+ *         description: Bad request - No audio file uploaded
+ *       '500':
+ *         description: Error processing audio or OpenAI API error
+ */
 // Endpoint for Speech-to-Text (STT)
 router.post('/', upload.single('audio'), async (req, res) => {
     try {
@@ -61,4 +96,3 @@ router.post('/', upload.single('audio'), async (req, res) => {
 });
 
 module.exports = router;
-

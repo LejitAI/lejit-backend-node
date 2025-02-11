@@ -9,7 +9,42 @@ const router = express.Router();
 const upload = multer({ dest: 'ocrpdfs/' });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
+/**
+ * @swagger
+ * /api/vision:
+ *   post:
+ *     summary: Extract text from images and PDFs using OCR
+ *     description: Upload an image or PDF file to extract text using OpenAI's vision models. Supports both image and PDF file types. For PDFs, each page is converted to an image before OCR.
+ *     tags: [Vision]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image or PDF file to be processed for text extraction. Supported formats are images (JPEG, PNG, etc.) and PDF.
+ *     responses:
+ *       '200':
+ *         description: Successful text extraction
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 text:
+ *                   type: string
+ *                   description: The extracted text content from the uploaded file.
+ *       '400':
+ *         description: Bad request - Unsupported file format. Please upload a PDF or an image.
+ *       '500':
+ *         description: Error processing file or OpenAI API error
+ */
 router.post('/', upload.single('file'), async (req, res) => {
     try {
         const filePath = req.file.path;

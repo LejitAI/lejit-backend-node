@@ -4,6 +4,78 @@ const HearingSchedule = require('../models/HearingSchedule');
 const Case = require('../models/Case');
 const User = require('../models/User');
 
+/**
+ * @swagger
+ * /api/hearing-schedule:
+ *   post:
+ *     summary: Create a new hearing schedule
+ *     description: Creates a new hearing schedule entry, associating it with a user and a case.
+ *     tags: [Hearing Schedule]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - caseId
+ *               - caseName
+ *               - date
+ *               - time
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: ID of the user for whom the hearing is scheduled
+ *               caseId:
+ *                 type: string
+ *                 description: ID of the case associated with the hearing
+ *               caseName:
+ *                 type: string
+ *                 description: Name of the case
+ *               date:
+ *                 type: string
+ *                 format: date
+ *                 description: Date of the hearing (YYYY-MM-DD)
+ *               time:
+ *                 type: string
+ *                 format: time
+ *                 description: Time of the hearing (HH:MM)
+ *     responses:
+ *       201:
+ *         description: Hearing schedule created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Hearing schedule created successfully
+ *                 hearingSchedule:
+ *                   type: object
+ *                   description: The newly created hearing schedule object
+ *       404:
+ *         description: User or Case not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: User not found or Case not found
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Server error
+ */
 // POST /api/hearing-schedule
 router.post('/', async (req, res) => {
     const { userId, caseId, caseName, date, time } = req.body;
@@ -37,6 +109,62 @@ router.post('/', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/hearing-schedule/{userId}:
+ *   get:
+ *     summary: Get hearing schedules by user ID
+ *     description: Retrieves a list of hearing schedules for a specific user, identified by userId.
+ *     tags: [Hearing Schedule]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         description: ID of the user to retrieve hearing schedules for
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Hearing schedules retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   caseName:
+ *                     type: string
+ *                     example: "Client vs Company"
+ *                   date:
+ *                     type: string
+ *                     format: date
+ *                     example: "2024-01-15"
+ *                   time:
+ *                     type: string
+ *                     format: time
+ *                     example: "10:00"
+ *       404:
+ *         description: No hearing schedules found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: No hearing schedules found
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Server error
+ */
 router.get('/:userId', async (req, res) => {
     const { userId } = req.params;
 

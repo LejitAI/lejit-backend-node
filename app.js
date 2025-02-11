@@ -1,7 +1,12 @@
 const express = require('express');
 const dotenv = require('dotenv');
-const path = require('path'); // Import path module
+const path = require('path');
+const cors = require("cors");
 const connectDB = require('./config/db');
+const swaggerJsDoc = require("swagger-jsdoc");
+const swaggerUi = require("swagger-ui-express");
+
+// Import routes
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const chatRoutes = require('./routes/chat');
@@ -16,15 +21,15 @@ const clientRoutes = require('./routes/client');
 const lawFirmRoutes = require('./routes/lawFirm');
 const teamMemberRoutes = require('./routes/teamMember');
 
-const cors = require("cors");
-const corsOptions = {
-   origin: '*', 
-   credentials: true,            // access-control-allow-credentials:true
-   optionSuccessStatus: 200,
-}
 dotenv.config();
 const app = express();
-app.use(cors(corsOptions)) // Use this after the variable declaration
+
+const corsOptions = {
+   origin: '*', 
+   credentials: true,
+   optionSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
 
 // Connect to MongoDB
 connectDB();
@@ -34,6 +39,42 @@ app.use(express.json());
 
 // Serve static files from the uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Swagger configuration
+const swaggerOptions = {
+    swaggerDefinition: {
+      openapi: "3.0.0",
+      info: {
+        title: "Your API",
+        version: "1.0.0",
+      },
+      servers: [
+        {
+          url: "https://app.lejit.ai/backend", // Change this to your API URL
+        },
+      ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+          },
+        },
+      },
+      security: [
+        {
+          bearerAuth: [],
+        },
+      ],
+    },
+    apis: ["./routes/*.js"], // Your API route files
+  };
+  
+
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+console.log("Swagger UI is available at https://app.lejit.ai/backend/api-docs");
 
 // Routes
 app.use('/api/auth', authRoutes);

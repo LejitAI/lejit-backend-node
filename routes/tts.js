@@ -20,6 +20,39 @@ async function streamAudio(text) {
 }
 
 // Endpoint for Text-to-Speech (TTS)
+/**
+ * @swagger
+ * /api/tts:
+ *   post:
+ *     summary: Convert text to speech
+ *     description: Synthesize speech from text using OpenAI's TTS model and stream the audio response.
+ *     tags: [Text-to-Speech]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               text:
+ *                 type: string
+ *                 description: Text to be converted to speech.
+ *     responses:
+ *       '200':
+ *         description: Successful audio stream
+ *         content:
+ *           audio/mpeg:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *               description: Audio stream in MPEG format.
+ *       '400':
+ *         description: Bad request - Text input is required
+ *       '500':
+ *         description: Error generating speech or OpenAI API error
+ */
 router.post('/', async (req, res) => {
     try {
         const { text } = req.body;
