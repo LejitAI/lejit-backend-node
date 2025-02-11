@@ -6,8 +6,41 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const LawFirm = require('../models/LawFirm'); // Ensure you have this model
 const router = express.Router();
-
 // Get all users with pagination and filters
+/**
+ * @swagger
+ * /api/admin/users:
+ *   get:
+ *     summary: Get all users with pagination and filters
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number (default is 1)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Number of results per page (default is 10)
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter users by status (active/inactive)
+ *       - in: query
+ *         name: searchTerm
+ *         schema:
+ *           type: string
+ *         description: Search query for username, email, company, or law firm
+ *     responses:
+ *       200:
+ *         description: List of users retrieved successfully
+ *       500:
+ *         description: Failed to fetch users
+ */
 router.get('/users', authenticateToken, authorizeAdmin, async (req, res) => {
     const { page = 1, limit = 10, status, searchTerm } = req.query;
 
@@ -46,6 +79,44 @@ router.get('/users', authenticateToken, authorizeAdmin, async (req, res) => {
 });
 
 // Admin validates the user
+/**
+ * @swagger
+ * /api/admin/users:
+ *   post:
+ *     summary: Create a new user (Admin only)
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               confirmPassword:
+ *                 type: string
+ *               law_firm_name:
+ *                 type: string
+ *                 description: Required if role is 'law_firm'
+ *               company_name:
+ *                 type: string
+ *                 description: Required if role is 'corporate'
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Failed to create user
+ */
 router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
@@ -65,6 +136,44 @@ router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req
 
 
 // Create new user (Admin only)
+/**
+ * @swagger
+ * /api/admin/users:
+ *   post:
+ *     summary: Create a new user (Admin only)
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               confirmPassword:
+ *                 type: string
+ *               law_firm_name:
+ *                 type: string
+ *                 description: Required if role is 'law_firm'
+ *               company_name:
+ *                 type: string
+ *                 description: Required if role is 'corporate'
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Failed to create user
+ */
 router.post('/users', authenticateToken, authorizeAdmin, async (req, res) => {
     const { role, username, email, password, confirmPassword, law_firm_name, company_name } = req.body;
 
@@ -189,6 +298,43 @@ router.post('/users', authenticateToken, authorizeAdmin, async (req, res) => {
 
 
 // Update user status
+/**
+ * @swagger
+ * /api/admin/users/{userId}:
+ *   patch:
+ *     summary: Update user status (Admin only)
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [active, suspended]
+ *               reason:
+ *                 type: string
+ *                 description: Required if suspending user
+ *     responses:
+ *       200:
+ *         description: User status updated
+ *       400:
+ *         description: Invalid status
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Failed to update status
+ */
 router.patch('/users/:userId', authenticateToken, authorizeAdmin, async (req, res) => {
     const { userId } = req.params;
     const { status, reason } = req.body;
@@ -220,7 +366,28 @@ router.patch('/users/:userId', authenticateToken, authorizeAdmin, async (req, re
 });
 
 //delete user
-
+/**
+ * @swagger
+ * /api/admin/users/{userId}:
+ *   delete:
+ *     summary: Delete a user (Admin only)
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID to delete
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Failed to delete user
+ */
 router.delete('/users/:userId', authenticateToken, authorizeAdmin, async (req, res) => {
     const { userId } = req.params;
 
@@ -250,6 +417,40 @@ router.delete('/users/:userId', authenticateToken, authorizeAdmin, async (req, r
 
 
 // Add users to law firm
+/**
+ * @swagger
+ * /api/admin/law-firms/{firmId}/users:
+ *   post:
+ *     summary: Add users to a law firm
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: firmId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Law firm ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: List of user IDs to add to the law firm
+ *     responses:
+ *       201:
+ *         description: Users added to law firm successfully
+ *       400:
+ *         description: Some users not found
+ *       500:
+ *         description: Failed to add users
+ */
 router.post('/law-firms/:firmId/users', authenticateToken, authorizeAdmin, async (req, res) => {
     const { firmId } = req.params;
     const { userIds } = req.body;
@@ -317,6 +518,28 @@ router.post('/law-firms/:firmId/users', authenticateToken, authorizeAdmin, async
 });
 
 // Get law firm details
+/**
+ * @swagger
+ * /api/admin/law-firms/{firmId}:
+ *   get:
+ *     summary: Get law firm details
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: firmId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Law firm ID
+ *     responses:
+ *       200:
+ *         description: Law firm details retrieved successfully
+ *       404:
+ *         description: Law firm not found
+ *       500:
+ *         description: Failed to fetch law firm details
+ */
 router.get('/law-firms/:firmId', authenticateToken, authorizeAdmin, async (req, res) => {
     const { firmId } = req.params;
 

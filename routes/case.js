@@ -3,18 +3,65 @@ const router = express.Router();
 const Case = require('../models/Case');
 const { authenticateToken } = require('../middleware/auth');
 
-// API to add a new case by an admin
+/**
+ * @swagger
+ * tags:
+ *   name: Cases
+ *   description: APIs for managing legal cases
+ */
+
+/**
+ * @swagger
+ * /api/case/add-case:
+ *   post:
+ *     summary: Add a new case (Admin Only)
+ *     tags: [Cases]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - startingDate
+ *               - caseType
+ *               - client
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: Title of the case
+ *               startingDate:
+ *                 type: string
+ *                 format: date
+ *               caseType:
+ *                 type: string
+ *                 description: Type of the case
+ *               client:
+ *                 type: string
+ *                 description: Client ID
+ *               oppositeClient:
+ *                 type: string
+ *               caseWitness:
+ *                 type: string
+ *               caseDescription:
+ *                 type: string
+ *               documents:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       201:
+ *         description: Case added successfully
+ *       400:
+ *         description: Missing required fields
+ *       500:
+ *         description: Server error
+ */
 router.post('/add-case', authenticateToken, async (req, res) => {
-    const {
-        title,
-        startingDate,
-        caseType,
-        client,
-        oppositeClient,
-        caseWitness,
-        caseDescription,
-        documents
-    } = req.body;
+    const { title, startingDate, caseType, client, oppositeClient, caseWitness, caseDescription, documents } = req.body;
 
     if (!title || !startingDate || !caseType || !client) {
         return res.status(400).json({ status: false, message: 'Please fill in all required fields.', data: {} });
@@ -42,15 +89,34 @@ router.post('/add-case', authenticateToken, async (req, res) => {
     }
 });
 
-// API to delete a case
+/**
+ * @swagger
+ * /api/case/delete-case/{id}:
+ *   delete:
+ *     summary: Delete a case by ID
+ *     tags: [Cases]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Case ID to delete
+ *     responses:
+ *       200:
+ *         description: Case deleted successfully
+ *       404:
+ *         description: Case not found
+ *       500:
+ *         description: Server error
+ */
 router.delete('/delete-case/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     try {
-        const deletedCase = await Case.findOneAndDelete({
-            _id: id,
-            createdBy: req.user.id
-        });
+        const deletedCase = await Case.findOneAndDelete({ _id: id, createdBy: req.user.id });
 
         if (!deletedCase) {
             return res.status(404).json({ status: false, message: 'Case not found or access denied.', data: {} });
@@ -63,26 +129,96 @@ router.delete('/delete-case/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// API to get all case details
+/**
+ * @swagger
+ * /api/case/get-cases:
+ *   get:
+ *     summary: Get all cases with pagination and search
+ *     tags: [Cases]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Number of records per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search term for case title or type
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Case status filter
+ *     responses:
+ *       200:
+ *         description: Cases retrieved successfully
+ *       500:
+ *         description: Server error
+ */
 router.get('/get-cases', authenticateToken, async (req, res) => {
     try {
-        const cases = await Case.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
-        res.status(200).json({ status: true, message: 'Cases retrieved successfully', data: cases });
+        const { page = 1, limit = 10, search = '', status } = req.query;
+        const query = { createdBy: req.user.id };
+
+        if (search) {
+            query.$or = [{ title: { $regex: search, $options: 'i' } }, { caseType: { $regex: search, $options: 'i' } }];
+        }
+
+        if (status) query.status = status;
+
+        const cases = await Case.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(Number(limit));
+        const totalCases = await Case.countDocuments(query);
+
+        res.status(200).json({
+            status: true,
+            message: 'Cases retrieved successfully',
+            data: { cases, totalCases, currentPage: Number(page), totalPages: Math.ceil(totalCases / limit) }
+        });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ status: false, message: 'Failed to retrieve cases. Please try again later.', data: {} });
+        res.status(500).json({ status: false, message: 'Failed to retrieve cases.', data: {} });
     }
 });
 
-// API to get a single case by ID
+/**
+ * @swagger
+ * /api/case/get-case/{id}:
+ *   get:
+ *     summary: Get a single case by ID
+ *     tags: [Cases]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Case ID
+ *     responses:
+ *       200:
+ *         description: Case retrieved successfully
+ *       404:
+ *         description: Case not found
+ *       500:
+ *         description: Server error
+ */
 router.get('/get-case/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-
         const caseDetail = await Case.findOne({ _id: id, createdBy: req.user.id });
 
         if (!caseDetail) {
-            return res.status(404).json({ status: false, message: 'Case not found or you do not have permission to view it.', data: {} });
+            return res.status(404).json({ status: false, message: 'Case not found or access denied.', data: {} });
         }
 
         res.status(200).json({ status: true, message: 'Case retrieved successfully', data: caseDetail });
@@ -93,74 +229,7 @@ router.get('/get-case/:id', authenticateToken, async (req, res) => {
             return res.status(400).json({ status: false, message: 'Invalid case ID format.', data: {} });
         }
 
-        res.status(500).json({ status: false, message: 'Failed to retrieve the case. Please try again later.', data: {} });
-    }
-});
-
-// Update timer for a case
-router.put('/update-case-timer/:id', authenticateToken, async (req, res) => {
-    const { id } = req.params;
-    const { timer, isRunning } = req.body;
-
-    if (typeof timer !== 'number' || typeof isRunning !== 'boolean') {
-        return res.status(400).json({ status: false, message: 'Invalid timer or isRunning value.', data: {} });
-    }
-
-    try {
-        const updatedCase = await Case.findOneAndUpdate(
-            { _id: id, createdBy: req.user.id },
-            { timer, isRunning },
-            { new: true }
-        );
-
-        if (!updatedCase) {
-            return res.status(404).json({ status: false, message: 'Case not found or access denied.', data: {} });
-        }
-
-        res.status(200).json({ status: true, message: 'Timer updated successfully', data: { case: updatedCase } });
-    } catch (error) {
-        console.error('Error updating timer:', error);
-        res.status(500).json({ status: false, message: 'Failed to update timer. Please try again later.', data: {} });
-    }
-});
-
-// API to update the status of a case
-router.put('/update-case-status/:id', authenticateToken, async (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!['ongoing', 'closed'].includes(status)) {
-        return res.status(400).json({ status: false, message: 'Invalid status value.', data: {} });
-    }
-
-    try {
-        const updatedCase = await Case.findOneAndUpdate(
-            { _id: id, createdBy: req.user.id },
-            { status },
-            { new: true }
-        );
-
-        if (!updatedCase) {
-            return res.status(404).json({ status: false, message: 'Case not found or access denied.', data: {} });
-        }
-
-        res.status(200).json({ status: true, message: 'Case status updated successfully', data: { case: updatedCase } });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ status: false, message: 'Failed to update case status. Please try again later.', data: {} });
-    }
-});
-
-// API to get case status count
-router.get('/case-status-count', authenticateToken, async (req, res) => {
-    try {
-        const activeCasesCount = await Case.countDocuments({ createdBy: req.user.id, status: 'ongoing' });
-        const closedCasesCount = await Case.countDocuments({ createdBy: req.user.id, status: 'closed' });
-
-        res.status(200).json({ status: true, message: 'Case status count retrieved successfully', data: { activeCases: activeCasesCount, closedCases: closedCasesCount } });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ status: false, message: 'Failed to retrieve case status count. Please try again later.', data: {} });
+        res.status(500).json({ status: false, message: 'Failed to retrieve the case.', data: {} });
     }
 });
 
