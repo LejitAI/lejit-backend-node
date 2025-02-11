@@ -35,7 +35,7 @@ const swaggerOptions = {
             version: '1.0.0',
             description: 'API documentation for my Node.js app',
         },
-        servers: [{ url: 'http://localhost:5000' }],
+        servers: [{ url: 'https://app.lejit.ai//backend' }],
     },
     apis: ['./routes/*.js'], // Scan route files for API documentation
 };
@@ -56,5 +56,5 @@ app.use('/api/adminModule', adminModuleRoutes);
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Swagger Docs available at http://localhost:${PORT}/api-docs`);
+    console.log(`Swagger Docs available at https://app.lejit.ai//backend/api-docs`);
 });
