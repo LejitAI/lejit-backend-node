@@ -13,7 +13,7 @@ const Appointment = require("../models/Appointment");
 
 
 
-// Add or update ChatGPT API key
+// Add or udate ChatGPT API key
 router.post('/set-chatgpt-api-key', authenticateToken, async (req, res) => {
     const { chatgptApiKey } = req.body;
 
