@@ -3,11 +3,49 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db'); // PostgreSQL connection
 const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
-const User = require('../models/User'); // Ensure this is the correct path to the User model
-const TeamMember = require('../models/TeamMember');
+const User = require('../models/User'); // PostgreSQL-based user module with functions:
+                                   // - createUser({ ... })
+                                   // - findUserByEmail(email)
+                                   // - matchPassword(enteredPassword, storedPassword)
+const TeamMember = require('../models/TeamMember'); // Your team member module
 const router = express.Router();
 
-// Register a new user (Citizen, Law Firm, Corporate)
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user (Citizen, Law Firm, Corporate)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               confirmPassword:
+ *                 type: string
+ *               law_firm_name:
+ *                 type: string
+ *                 description: Required if role is 'law_firm'
+ *               company_name:
+ *                 type: string
+ *                 description: Required if role is 'corporate'
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Failed to register user
+ */
 router.post('/register', async (req, res) => {
     const { role, username, email, password, confirmPassword, law_firm_name, company_name } = req.body;
 
@@ -15,20 +53,16 @@ router.post('/register', async (req, res) => {
         if (!role || !username || !email || !password || !confirmPassword) {
             return res.status(400).json({ message: 'All fields are required' });
         }
-
         if (password !== confirmPassword) {
             return res.status(400).json({ message: 'Passwords do not match' });
         }
-
-        const existingUser = await User.findUserByEmail(email); // Use the correct method to find user by email
+        const existingUser = await User.findUserByEmail(email);
         if (existingUser) {
             return res.status(400).json({ message: 'Email or Username is already registered' });
         }
-
         if (role === 'law_firm' && !law_firm_name) {
             return res.status(400).json({ message: 'Law firm name is required for law firms' });
         }
-
         if (role === 'corporate' && !company_name) {
             return res.status(400).json({ message: 'Company name is required for corporates' });
         }
@@ -44,6 +78,7 @@ router.post('/register', async (req, res) => {
         });
 
         if (role === 'law_firm') {
+            // Create a team member for law firms
             const teamMember = await TeamMember.createTeamMember({
                 personalDetails: {
                     name: username,
@@ -85,8 +120,7 @@ router.post('/register', async (req, res) => {
                 password: password,
                 createdBy: newUser.id
             });
-
-            await teamMember.save();
+            // Optionally, you can check or log teamMember if needed.
         }
 
         const token = jwt.sign(
@@ -111,7 +145,32 @@ router.post('/register', async (req, res) => {
     }
 });
 
-//login
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: User login
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successful login
+ *       400:
+ *         description: Missing credentials
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -120,21 +179,22 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ message: 'Email and password are required' });
         }
 
-        const user = await User.findOne({ email });
+        const user = await User.findUserByEmail(email);
         if (!user) {
             return res.status(401).json({ message: 'User not found. Please register first.' });
         }
 
-        if (!(await user.matchPassword(password))) {
+        const isMatch = await User.matchPassword(password, user.password);
+        if (!isMatch) {
             return res.status(401).json({ message: 'Incorrect password' });
         }
 
         const token = jwt.sign(
-            { id: user._id, role: user.role },
+            { id: user.id, role: user.role },
             process.env.JWT_SECRET
         );
         
-        // Get team member details if it's a law firm
+        // If user is a law firm, fetch associated team member details
         let teamMemberDetails = null;
         if (user.role === 'law_firm') {
             teamMemberDetails = await TeamMember.findOne({ 'personalDetails.email': email })
@@ -145,7 +205,7 @@ router.post('/login', async (req, res) => {
             token, 
             role: user.role,
             user: {
-                id: user._id,
+                id: user.id,
                 username: user.username,
                 email: user.email,
                 role: user.role,
@@ -159,23 +219,38 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Fetch User Profile (Shared for all roles)
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   get:
+ *     summary: Fetch user profile
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profile retrieved successfully
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select('-password');
+        // Adjust this function if you have a dedicated method to find by ID
+        const user = await User.findById(req.user.id); 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
         let teamMemberDetails = null;
         if (user.role === 'law_firm') {
-            teamMemberDetails = await TeamMember.findOne({ createdBy: user._id })
+            teamMemberDetails = await TeamMember.findOne({ createdBy: user.id })
                 .select('-password');
         }
 
         res.json({
             user: {
-                id: user._id,
+                id: user.id,
                 username: user.username,
                 email: user.email,
                 role: user.role,
@@ -189,10 +264,30 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-// Admin validates the user
+/**
+ * @swagger
+ * /api/auth/validate-user/{id}:
+ *   patch:
+ *     summary: Admin validates the user
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: ID of the user to validate
+ *     responses:
+ *       200:
+ *         description: User validated successfully
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
 router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req, res) => {
     try {
-        // Update the validation status of a user
         const validateUserQuery = 'UPDATE users SET validated = true WHERE id = $1 RETURNING *';
         const result = await pool.query(validateUserQuery, [req.params.id]);
 
@@ -208,7 +303,19 @@ router.patch('/validate-user/:id', authenticateToken, authorizeAdmin, async (req
     }
 });
 
-// Signout
+/**
+ * @swagger
+ * /api/auth/signout:
+ *   post:
+ *     summary: User signout
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Signed out successfully
+ *       500:
+ *         description: Server error
+ */
 router.post('/signout', authenticateToken, async (req, res) => {
     try {
         res.status(200).json({ message: 'Signed out successfully' });
