@@ -4,8 +4,8 @@ const { pool } = require('../config/db'); // Import your PostgreSQL connection
 // Create a new user
 const createUser = async (userData) => {
     const { role, username, email, password, company_name, law_firm_name, validated } = userData;
-
     try {
+        // Hash the password before inserting
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -16,7 +16,6 @@ const createUser = async (userData) => {
         `;
         const values = [role, username, email, hashedPassword, company_name, law_firm_name, validated];
         const result = await pool.query(query, values);
-
         return result.rows[0];
     } catch (err) {
         throw new Error(`Error creating user: ${err.message}`);
@@ -28,14 +27,13 @@ const findUserByEmail = async (email) => {
     try {
         const query = `SELECT * FROM users WHERE email = $1`;
         const result = await pool.query(query, [email]);
-
         return result.rows[0];
     } catch (err) {
         throw new Error(`Error finding user: ${err.message}`);
     }
 };
 
-// Match password
+// Compare entered password with stored hashed password
 const matchPassword = async (enteredPassword, storedPassword) => {
     try {
         return await bcrypt.compare(enteredPassword, storedPassword);
@@ -47,6 +45,13 @@ const matchPassword = async (enteredPassword, storedPassword) => {
 // Update a user
 const updateUser = async (id, updateData) => {
     try {
+        // If password is being updated, hash it before updating the record
+        if (updateData.password) {
+            const salt = await bcrypt.genSalt(10);
+            updateData.password = await bcrypt.hash(updateData.password, salt);
+        }
+        
+        // Build the dynamic SET clause for the update query
         const fields = Object.keys(updateData)
             .map((key, index) => `${key} = $${index + 1}`)
             .join(', ');
@@ -59,14 +64,12 @@ const updateUser = async (id, updateData) => {
             RETURNING *;
         `;
         const result = await pool.query(query, [...values, id]);
-
         return result.rows[0];
     } catch (err) {
         throw new Error(`Error updating user: ${err.message}`);
     }
 };
 
-// Export the functions
 module.exports = {
     createUser,
     findUserByEmail,
