@@ -1,102 +1,95 @@
-const { pool } = require('../config/db'); // PostgreSQL connection
+// models/Case.js
+const { pool } = require('../config/db');
 
-// Create a new case
+/**
+ * Create a new case record.
+ *
+ * Expected input object structure:
+ * {
+ *   title: 'Case Title',
+ *   startingDate: '2025-02-22T00:00:00.000Z', // ISO 8601 date string
+ *   caseType: 'Civil',
+ *   client: 'Client Name',
+ *   oppositeClient: 'Opposite Client Name',
+ *   caseWitness: 'Witness Name',
+ *   caseDescription: 'Detailed description of the case',
+ *   documents: ['doc1.pdf', 'doc2.pdf'], // an array of document paths or URLs
+ *   createdBy: 1,  // the ID of the user who created the case
+ *   timer: 0,      // optional, defaults to 0
+ *   isRunning: true, // optional, defaults to true
+ *   startTime: '2025-02-22T00:00:00.000Z', // optional, defaults to now()
+ *   status: 'ongoing' // optional, defaults to 'ongoing'
+ * }
+ */
 const createCase = async (caseData) => {
-    const {
-        title,
-        startingDate,
-        caseType,
-        client,
-        oppositeClient,
-        caseWitness,
-        caseDescription,
-        documents,
-        createdBy,
-        timer,
-        isRunning
-    } = caseData;
+  const {
+    title,
+    startingDate,
+    caseType,
+    client,
+    oppositeClient,
+    caseWitness,
+    caseDescription,
+    documents,
+    createdBy,
+    timer = 0,
+    isRunning = true,
+    startTime,
+    status = 'ongoing'
+  } = caseData;
 
-    try {
-        const query = `
-            INSERT INTO cases (title, starting_date, case_type, client, opposite_client, case_witness, case_description, documents, created_by, timer, is_running)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-            RETURNING *;
-        `;
-        const values = [title, startingDate, caseType, client, oppositeClient, caseWitness, caseDescription, documents, createdBy, timer, isRunning];
+  const query = `
+    INSERT INTO cases (
+      title, starting_date, case_type, client, opposite_client,
+      case_witness, case_description, documents, created_by,
+      created_at, timer, is_running, start_time, status
+    )
+    VALUES (
+      $1, $2, $3, $4, $5,
+      $6, $7, $8, $9,
+      now(), $10, $11, $12, $13
+    )
+    RETURNING *;
+  `;
+  // Use startTime if provided, otherwise let the DB default it.
+  const values = [
+    title,
+    startingDate,
+    caseType,
+    client,
+    oppositeClient,
+    caseWitness,
+    caseDescription,
+    documents, // this should be an array of strings
+    createdBy,
+    timer,
+    isRunning,
+    startTime || new Date(), // if not provided, use current date/time
+    status
+  ];
 
-        const result = await pool.query(query, values);
-        return result.rows[0];
-    } catch (err) {
-        throw new Error(`Error creating case: ${err.message}`);
-    }
+  try {
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  } catch (error) {
+    throw new Error(`Error creating case: ${error.message}`);
+  }
 };
 
-// Get all cases created by a specific user
-const getCasesByUser = async (userId) => {
-    try {
-        const query = 'SELECT * FROM cases WHERE created_by = $1 ORDER BY created_at DESC';
-        const result = await pool.query(query, [userId]);
-
-        return result.rows;
-    } catch (err) {
-        throw new Error(`Error retrieving cases: ${err.message}`);
-    }
-};
-
-// Find a case by ID
-const findCaseById = async (id) => {
-    try {
-        const query = 'SELECT * FROM cases WHERE id = $1';
-        const result = await pool.query(query, [id]);
-
-        return result.rows[0];
-    } catch (err) {
-        throw new Error(`Error finding case: ${err.message}`);
-    }
-};
-
-// Update a case
-const updateCase = async (id, userId, updateData) => {
-    try {
-        if (Object.keys(updateData).length === 0) {
-            throw new Error('No fields to update.');
-        }
-
-        const fields = Object.keys(updateData)
-            .map((key, index) => `${key} = $${index + 1}`)
-            .join(', ');
-        const values = Object.values(updateData);
-
-        const query = `
-            UPDATE cases
-            SET ${fields}, created_at = CURRENT_TIMESTAMP
-            WHERE id = $${values.length + 1} AND created_by = $${values.length + 2}
-            RETURNING *;
-        `;
-
-        const result = await pool.query(query, [...values, id, userId]);
-        return result.rowCount > 0 ? result.rows[0] : null;
-    } catch (err) {
-        throw new Error(`Error updating case: ${err.message}`);
-    }
-};
-
-// Delete a case (Only if created by the user)
-const deleteCase = async (id, userId) => {
-    try {
-        const query = 'DELETE FROM cases WHERE id = $1 AND created_by = $2 RETURNING *';
-        const result = await pool.query(query, [id, userId]);
-
-        return result.rowCount > 0 ? result.rows[0] : null;
-    } catch (err) {
-        throw new Error(`Error deleting case: ${err.message}`);
-    }
+/**
+ * Retrieve a case record by its ID.
+ */
+const getCaseById = async (id) => {
+  const query = `SELECT * FROM cases WHERE id = $1;`;
+  try {
+    const result = await pool.query(query, [id]);
+    return result.rows[0];
+  } catch (error) {
+    throw new Error(`Error retrieving case: ${error.message}`);
+  }
 };
 
 module.exports = {
-    createCase,
-    getCasesByUser,
-    findCaseById,
-    updateCase,
-    deleteCase,
+  createCase,
+  getCaseById,
 };
