@@ -554,6 +554,8 @@ router.get('/get-law-firm-details', authenticateToken, async (req, res) => {
 router.put('/update-law-firm-details', authenticateToken, async (req, res) => {
     try {
         const { lawFirmDetails, professionalDetails, bankAccountDetails } = req.body;
+        console.log('Request Body:', req.body);
+        console.log('User ID:', req.user.id);
 
         const updatedDetails = await ImageForm.findOneAndUpdate(
             { createdBy: req.user.id },
